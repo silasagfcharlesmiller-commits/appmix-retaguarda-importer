@@ -1,0 +1,10 @@
+﻿APP-MIX - PACOTE PARA VM
+
+1. Copie esta pasta inteira para a VM Windows.
+2. Proteja config_mix.json: ele possui a conexao do banco.
+3. Abra APP-MIX-WORKER.exe e deixe-o em execucao.
+4. Abra APP-MIX-API.exe para aceitar integracoes na porta configurada.
+5. Abra APP-MIX.exe para uso humano da interface.
+6. Na primeira abertura da API, consulte a chave criada em config_api.json.
+7. Python, pip e Chromium nao sao necessarios na VM.
+8. A VM precisa acessar o PostgreSQL e as APIs HTTPS da Mix Fiscal.

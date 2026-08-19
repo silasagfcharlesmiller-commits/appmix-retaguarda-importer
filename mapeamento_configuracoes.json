@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "pagina": {
+    "link_abrir": "a.nav-link:has-text('Configuração')",
+    "botao_editar": "Editar",
+    "container": "div.modal-content:visible, div.modal.show:visible, div.tab-pane.active:visible, body",
+    "botao_salvar": "Salvar|Guardar|Atualizar"
+  },
+  "secoes": {
+    "pis_cofins": {
+      "rotulo": "PIS/COFINS",
+      "campos": {
+        "ncm": "NCM", "ncmex": "NCMEX", "cod_natureza_receita": "Cód. Natureza Receita",
+        "credito_presumido": "Crédito Presumido", "pis_cst_e": "PIS CST E", "pis_cst_s": "PIS CST S",
+        "pis_alq_e": "PIS ALQ E", "pis_alq_s": "PIS ALQ S", "cofins_cst_e": "COFINS CST E",
+        "cofins_cst_s": "COFINS CST S", "cofins_alq_e": "COFINS ALQ E", "cofins_alq_s": "COFINS ALQ S"
+      }
+    },
+    "ibs_cbs": {
+      "rotulo": "IBS/CBS",
+      "campos": {
+        "classe_tributaria": "Classe Tributária", "cbs_alq": "CBS ALQ", "ibs_uf_alq": "IBS UF ALQ",
+        "ibs_mun_alq": "IBS MUN ALQ", "is_classe_tributaria": "IS Classe Tributária",
+        "is_alq_especifica": "IS ALQ Específica", "ibs_cbs_cst": "IBS/CBS CST",
+        "cbs_alq_rbc": "CBS ALQ RBC", "ibs_uf_alq_rbc": "IBS UF ALQ RBC",
+        "ibs_mun_alq_rbc": "IBS MUN ALQ RBC", "is_alq": "IS ALQ"
+      }
+    },
+    "ibs_cbs_rural": { "rotulo": "IBS/CBS(RURAL)", "herda_campos_de": "ibs_cbs" },
+    "ibs_cbs_gov": { "rotulo": "IBS/CBS(GOV)", "herda_campos_de": "ibs_cbs" },
+    "icms_entrada": {
+      "rotulo": "ICMS de Entrada",
+      "grupos": {
+        "ei": { "rotulo": "EI", "campos": { "cst": "CST", "alq": "ALQ", "alqst": "ALQST", "rbc": "RBC", "rbcst": "RBCST" } },
+        "ed": { "rotulo": "ED", "campos": { "cst": "CST", "alq": "ALQ", "alqst": "ALQST", "rbc": "RBC", "rbcst": "RBCST" } },
+        "es": { "rotulo": "ES", "campos": { "cst": "CST", "alq": "ALQ", "alqst": "ALQST", "rbc": "RBC", "rbcst": "RBCST" } },
+        "nf": { "rotulo": "NF", "campos": { "nfi_cst": "NFI_CST", "nfd_cst": "NFD_CST", "nfs_csosn": "NFS_CSOSN", "alq": "ALQ" } },
+        "outros_icms": { "rotulo": "", "campos": { "mva": "MVA", "tipo_mva": "Tipo MVA", "mva_data_ini": "MVA Data Ini", "mva_data_fim": "MVA Data Fim", "cred_outorgado": "Cred. Outorgado", "gera_debito": "Gera Débito", "sub_rbc_alq": "sub_rbc_alq" } }
+      }
+    },
+    "icms_saida": {
+      "rotulo": "ICMS de Saída",
+      "grupos": {
+        "sac": { "rotulo": "SAC", "campos": { "cst": "CST", "alq": "ALQ", "alqst": "ALQST", "rbc": "RBC", "rbcst": "RBCST", "cbenef_alq": "CBENEF_ALQ", "cest": "CEST" } },
+        "sas": { "rotulo": "SAS", "campos": { "cst": "CST", "alq": "ALQ", "alqst": "ALQST", "rbc": "RBC", "rbcst": "RBCST", "cbenef_alq": "CBENEF_ALQ", "re29560": "RE29560" } },
+        "svc": { "rotulo": "SVC", "campos": { "cst": "CST", "alq": "ALQ", "alqst": "ALQST", "rbc": "RBC", "rbcst": "RBCST", "cbenef_alq": "CBENEF_ALQ", "fecp": "FECP" } },
+        "snc": { "rotulo": "SNC", "campos": { "cst": "CST", "alq": "ALQ", "alqst": "ALQST", "rbc": "RBC", "rbcst": "RBCST", "cbenef_alq": "CBENEF_ALQ", "fecp_st": "FECP_ST" } },
+        "simples_nacional": { "rotulo": "Simples Nacional", "campos": { "sss_csosn": "SSS_CSOSN", "svc_csosn": "SVC_CSOSN", "snc_csosn": "SNC_CSOSN" } }
+      }
+    }
+  }
+}

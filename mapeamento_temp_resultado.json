@@ -1,0 +1,572 @@
+[
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Suporte",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[1]/div[2]/div[2]/form[1]/div[1]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Mix Fiscal Inteligência Tribut...",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[1]/div[2]/div[2]/form[1]/div[1]/div[2]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "MIX FISCAL INTELIGENCIA TRIBUT...",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[1]/div[2]/div[2]/form[1]/div[1]/div[3]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "submit",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[1]/div[2]/div[3]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "FILTRO",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[1]/div[2]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "add",
+        "name": "",
+        "placeholder": "",
+        "text": "Criar Novo",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"add\"]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Download Robo-Integrador",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[1]/div[2]/div[1]/button[3]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "name": "",
+        "placeholder": "CNPJ do cliente",
+        "text": "52703958000142",
+        "label_proximo": "CNPJ",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[2]/div[1]/div[1]/form[1]/div[1]/div[1]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "name": "",
+        "placeholder": "Digite o nome da empresa",
+        "text": "",
+        "label_proximo": "Nome Empresa",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[2]/div[1]/div[1]/form[1]/div[1]/div[2]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "number",
+        "id": "",
+        "name": "",
+        "placeholder": "ID Cmf",
+        "text": "",
+        "label_proximo": "ID CMF",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[2]/div[1]/div[1]/form[1]/div[1]/div[3]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "number",
+        "id": "",
+        "name": "",
+        "placeholder": "ID MXF",
+        "text": "",
+        "label_proximo": "ID MXF",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[2]/div[1]/div[1]/form[1]/div[1]/div[4]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "switch-is_active",
+        "name": "is_active",
+        "placeholder": "",
+        "text": "true",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"switch-is_active\"]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "react-select-2-input",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"react-select-2-input\"]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "react-select-3-input",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"react-select-3-input\"]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "react-select-4-input",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"react-select-4-input\"]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "name": "",
+        "placeholder": "Empresa ERP",
+        "text": "",
+        "label_proximo": "Empresa ERP",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[2]/div[1]/div[1]/form[1]/div[1]/div[9]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "name": "",
+        "placeholder": "Software",
+        "text": "",
+        "label_proximo": "Software",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[2]/div[1]/div[1]/form[1]/div[1]/div[10]/div[1]/input[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Cancelar",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[2]/div[1]/div[1]/form[1]/div[2]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "submit",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Filtrar",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"root\"]/div[2]/div[2]/div[4]/div[2]/div[2]/div[1]/div[1]/form[1]/div[2]/button[2]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[1]/button[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "on",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[1]/input[1]"
+    },
+    {
+        "tag": "textarea",
+        "type": "textarea",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Sem observações",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/form[1]/div[1]/div[2]/textarea[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "on",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/input[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": " \nIMPORTAR",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[2]/div[1]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": " \nENVIAR",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[2]/div[1]/div[2]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": " \nSOLICITAR",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[2]/div[1]/div[3]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": " \nGRAVAR",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[2]/div[1]/div[4]/button[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "on",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[2]/div[2]/div[1]/div[1]/div[1]/div[1]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "on",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[2]/div[2]/div[2]/div[1]/div[1]/div[1]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "on",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[2]/div[2]/div[3]/div[1]/div[1]/div[1]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "on",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div[1]/div[2]/div[2]/div[4]/div[1]/div[1]/div[1]/div[1]/input[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Realizar consulta SQL no BDCliente",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[3]/div[1]/div[1]/div[1]/div[1]/form[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": " Testar conexão",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[3]/div[1]/div[1]/div[1]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "submit",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[3]/div[1]/div[1]/div[1]/div[1]/button[2]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "tmp_1234_victor_piscofins_301",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "DELETE FROM tmp_1234_victor_piscofins_301",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[2]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "true",
+        "label_proximo": "Zerar TMP PIS E COFINS antes de Sincronizar?",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[3]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "false",
+        "label_proximo": "Gravar PIS E COFINS apenas aprovados?",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[4]/div[1]/input[1]"
+    },
+    {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "false",
+        "label_proximo": "Gravar PIS E COFINS todos produtos classificados?",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[5]/div[1]/input[1]"
+    },
+    {
+        "tag": "textarea",
+        "type": "textarea",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "INSERT INTO tmp_1234_victor_piscofins_301(\ncodigo_produto, \nean, \nncm, \nncm_ex, \ncod_natureza_receita,  \npis_cst_e, \npis_cst_s, \npis_alq_e, \npis_alq_s, \ncofins_cst_e, \ncofins_cst_s, \ncofins_alq_e, \ncofins_alq_s, \nfundamento_legal\n)",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[6]/textarea[1]"
+    },
+    {
+        "tag": "textarea",
+        "type": "textarea",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "%%CODIGO_PRODUTO%%,\n%%EAN%%\t,\n%%NCM%%\t,\n%%NCM_EX%%,\n%%COD_SPED%%,\n%%PIS_CST_E%%\t,\n%%PIS_CST_S%%\t,\n%%PIS_ALQ_E%%\t,\n%%PIS_ALQ_S%%\t,\n%%COFINS_CST_E%%\t,\n%%COFINS_CST_S%%\t,\n%%COFINS_ALQ_E%%\t,\n%%COFINS_ALQ_S%%\t,\n%%FUNDAMENTO_LEGAL%%",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[7]/textarea[1]"
+    },
+    {
+        "tag": "textarea",
+        "type": "textarea",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[8]/textarea[1]"
+    },
+    {
+        "tag": "button",
+        "type": "submit",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Salvar",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[9]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "Cancelar",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/div[1]/form[1]/div[9]/button[2]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "ENVIO DE CARGA (ROBOT)",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/h2[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "REGISTROS DE AGENDAMENTOS",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/h2[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-0\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-1\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-2\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-3\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-4\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-5\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-6\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-7\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-8\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "",
+        "label_proximo": "",
+        "xpath": "//*[@id=\"row-9\"]/div[1]/button[1]"
+    },
+    {
+        "tag": "button",
+        "type": "button",
+        "id": "",
+        "name": "",
+        "placeholder": "",
+        "text": "REGISTROS DE LOGS",
+        "label_proximo": "",
+        "xpath": "/html/body/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[3]/div[3]/div[1]/h2[1]/button[1]"
+    }
+]
