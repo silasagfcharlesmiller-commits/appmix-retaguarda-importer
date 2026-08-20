@@ -76,6 +76,7 @@ async function handler(request: NextRequest, context: { params: Promise<{ path: 
     return NextResponse.json({ detail: "Rota ainda nao disponivel no modo temporario." }, { status: 404 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha interna.";
+    console.error("Falha na integracao APP MIX:", message);
     return NextResponse.json({ detail: process.env.NODE_ENV === "development" ? message : "Servico temporariamente indisponivel." }, { status: 500 });
   }
 }
