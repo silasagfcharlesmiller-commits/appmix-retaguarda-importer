@@ -23,7 +23,10 @@ function pool() {
     max: 4,
     idleTimeoutMillis: 20000,
     connectionTimeoutMillis: 10000,
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+    // O PostgreSQL atual da empresa ainda nao oferece TLS. Assim que ele for
+    // habilitado, cadastre DATABASE_SSL=true na hospedagem para criptografar
+    // a conexao sem precisar alterar novamente o codigo.
+    ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
   });
   return globalForDb.appMixPool;
 }
