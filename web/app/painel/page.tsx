@@ -48,7 +48,7 @@ export default function PainelPage() {
     const response = await fetch("/api/mix/v1/lotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template_id: Number(form.get("template_id")), cnpjs, origem: "Painel web" }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) return setNotice(result.detail || "Nao foi possivel criar o lote.");
-    setNotice(`Lote criado com ${result.quantidade} empresa(s). O worker iniciara o processamento.`);
+    setNotice(`Carga parcial criada para ${result.quantidade} empresa(s). O worker iniciará a importação e a gravação.`);
     setCnpjText("");
     setShowNew(false);
     await load();
@@ -66,8 +66,10 @@ export default function PainelPage() {
       </aside>
 
       <main className="content">
-        <header className="topbar"><button className="mobile-menu"><Menu /></button><div><span className="eyebrow dark">CENTRAL OPERACIONAL</span><h1>Visao geral</h1></div><div className="top-actions"><button className="icon-button" onClick={load} title="Atualizar"><RefreshCw size={18} /></button><button className="primary-button compact" onClick={() => setShowNew(true)}><FilePlus2 size={18} /> Novo lote</button></div></header>
+        <header className="topbar"><button className="mobile-menu"><Menu /></button><div><span className="eyebrow dark">CENTRAL OPERACIONAL</span><h1>Visao geral</h1></div><div className="top-actions"><button className="icon-button" onClick={load} title="Atualizar"><RefreshCw size={18} /></button><button className="primary-button compact" onClick={() => setShowNew(true)}><FilePlus2 size={18} /> Realizar carga parcial</button></div></header>
         {notice && <div className="notice"><span>{notice}</span><button onClick={() => setNotice("")}><XCircle size={17} /></button></div>}
+
+        <section className="automation-flow"><div><span className="eyebrow dark">FLUXO DE AUTOMAÇÃO</span><h2>Carga parcial por CNPJ</h2><p>Cadastre as regras uma vez e execute a importação e a gravação para um ou vários clientes.</p></div><div className="flow-steps"><a href="/painel/templates"><b>1</b><span><strong>Cadastrar template</strong><small>Configure VIEW, TMP, flags e divergências.</small></span></a><button type="button" onClick={() => setShowNew(true)}><b>2</b><span><strong>Realizar carga parcial</strong><small>Escolha o template e informe os CNPJs.</small></span><ChevronRight size={18}/></button></div></section>
 
         <section className="metric-grid">
           <Metric label="Aguardando" value={counts.pendente || 0} icon={<Clock3 />} tone="amber" onClick={() => setFilter("pendente")} />
@@ -84,7 +86,7 @@ export default function PainelPage() {
         </section>
       </main>
 
-      {showNew && <div className="modal-backdrop" onMouseDown={() => setShowNew(false)}><form className="modal" onSubmit={createBatch} onMouseDown={(e) => e.stopPropagation()}><div className="modal-title"><div><span className="eyebrow dark">NOVA EXECUCAO</span><h2>Criar lote</h2></div><button type="button" onClick={() => setShowNew(false)}><XCircle /></button></div><label>Template<select name="template_id" required defaultValue=""><option value="" disabled>Selecione um template</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label><label>CNPJs<textarea name="cnpjs" rows={7} required inputMode="numeric" value={cnpjText} onChange={(event) => setCnpjText(event.target.value)} onBlur={() => setCnpjText(parseCnpjs(cnpjText).join("\n"))} placeholder={"Cole um ou vários CNPJs\nAceita pontos, barra e hífen"} /></label><div className={`cnpj-counter ${parseCnpjs(cnpjText).some((cnpj) => cnpj.length !== 14) ? "invalid" : ""}`}><strong>{parseCnpjs(cnpjText).length}</strong> CNPJ(s) identificado(s){parseCnpjs(cnpjText).some((cnpj) => cnpj.length !== 14) && " — existe item com quantidade diferente de 14 dígitos"}</div><button className="primary-button">Enviar para processamento <ChevronRight size={18} /></button></form></div>}
+      {showNew && <div className="modal-backdrop" onMouseDown={() => setShowNew(false)}><form className="modal" onSubmit={createBatch} onMouseDown={(e) => e.stopPropagation()}><div className="modal-title"><div><span className="eyebrow dark">AUTOMAÇÃO POR CNPJ</span><h2>Realizar carga parcial</h2><p>O worker importará e gravará os dados no banco de cada cliente.</p></div><button type="button" onClick={() => setShowNew(false)}><XCircle /></button></div><div className="modal-step"><b>1</b><label>Template fiscal<select name="template_id" required defaultValue=""><option value="" disabled>Selecione o template da carga</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select><small>Não encontrou? <a href="/painel/templates">Cadastre ou copie um template.</a></small></label></div><div className="modal-step"><b>2</b><label>CNPJs dos clientes<textarea name="cnpjs" rows={7} required inputMode="numeric" value={cnpjText} onChange={(event) => setCnpjText(event.target.value)} onBlur={() => setCnpjText(parseCnpjs(cnpjText).join("\n"))} placeholder={"Cole um ou vários CNPJs, um por linha\nAceita pontos, barra e hífen"} /></label></div><div className={`cnpj-counter ${parseCnpjs(cnpjText).some((cnpj) => cnpj.length !== 14) ? "invalid" : ""}`}><strong>{parseCnpjs(cnpjText).length}</strong> CNPJ(s) identificado(s){parseCnpjs(cnpjText).some((cnpj) => cnpj.length !== 14) && " — existe item com quantidade diferente de 14 dígitos"}</div><button className="primary-button">Iniciar carga parcial <ChevronRight size={18} /></button></form></div>}
     </div>
   );
 }

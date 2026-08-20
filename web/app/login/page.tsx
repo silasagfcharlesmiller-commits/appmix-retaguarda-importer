@@ -1,11 +1,12 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowRight, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,7 +45,7 @@ export default function LoginPage() {
           <h2>Bem-vindo de volta</h2>
           <p className="muted">Entre com seu acesso para abrir o painel.</p>
           <label>Usuário de acesso<input name="email" type="text" autoComplete="username" required placeholder="Digite seu usuário" /></label>
-          <label>Senha<input name="password" type="password" autoComplete="current-password" required placeholder="Sua senha" /></label>
+          <label>Senha<span className="password-input"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Sua senha" /><button type="button" onClick={() => setShowPassword(!showPassword)} title={showPassword ? "Ocultar senha" : "Visualizar senha"}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></span></label>
           {error && <div className="form-error">{error}</div>}
           <button className="primary-button" disabled={loading}>{loading ? "Entrando..." : <>Entrar no painel <ArrowRight size={18} /></>}</button>
           <small>Ao entrar, voce concorda com as politicas internas de seguranca.</small>

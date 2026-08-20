@@ -51,7 +51,7 @@ export async function updateUser(email: string, login: string, currentPassword: 
   if (login.length < 3 || login.length > 180) throw new Error("Informe um usuario de acesso valido.");
   const duplicate = await query("SELECT 1 FROM public.web_users WHERE LOWER(email)=LOWER($1) AND id<>$2", [login, auth.id]);
   if (duplicate.rowCount) throw new Error("Este usuario de acesso ja esta em uso.");
-  if (newPassword && (newPassword.length < 12 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword))) throw new Error("A nova senha precisa ter 12 caracteres, letra, numero e simbolo.");
+  if (newPassword && (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword))) throw new Error("A nova senha precisa ter 8 caracteres, letra, numero e simbolo.");
   if (newPassword) await query("UPDATE public.web_users SET nome=$1,email=$1,password_hash=$2,atualizado_em=NOW() WHERE id=$3", [login, await hashPassword(newPassword), auth.id]);
   else await query("UPDATE public.web_users SET nome=$1,email=$1,atualizado_em=NOW() WHERE id=$2", [login, auth.id]);
   return { ...auth, nome:login, email:login };
