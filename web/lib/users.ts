@@ -44,12 +44,15 @@ export async function getUser(email: string) {
   return result.rows[0] || null;
 }
 
-export async function updateUser(email: string, nome: string, currentPassword: string, newPassword?: string) {
+export async function updateUser(email: string, login: string, currentPassword: string, newPassword?: string) {
   const auth = await authenticateUser(email, currentPassword);
   if (!auth) throw new Error("Senha atual incorreta.");
-  if (nome.trim().length < 2 || nome.trim().length > 100) throw new Error("Informe um nome valido.");
+  login = login.trim().toLowerCase();
+  if (login.length < 3 || login.length > 180) throw new Error("Informe um usuario de acesso valido.");
+  const duplicate = await query("SELECT 1 FROM public.web_users WHERE LOWER(email)=LOWER($1) AND id<>$2", [login, auth.id]);
+  if (duplicate.rowCount) throw new Error("Este usuario de acesso ja esta em uso.");
   if (newPassword && (newPassword.length < 12 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword))) throw new Error("A nova senha precisa ter 12 caracteres, letra, numero e simbolo.");
-  if (newPassword) await query("UPDATE public.web_users SET nome=$1,password_hash=$2,atualizado_em=NOW() WHERE id=$3", [nome.trim(), await hashPassword(newPassword), auth.id]);
-  else await query("UPDATE public.web_users SET nome=$1,atualizado_em=NOW() WHERE id=$2", [nome.trim(), auth.id]);
-  return { ...auth, nome:nome.trim() };
+  if (newPassword) await query("UPDATE public.web_users SET nome=$1,email=$1,password_hash=$2,atualizado_em=NOW() WHERE id=$3", [login, await hashPassword(newPassword), auth.id]);
+  else await query("UPDATE public.web_users SET nome=$1,email=$1,atualizado_em=NOW() WHERE id=$2", [login, auth.id]);
+  return { ...auth, nome:login, email:login };
 }

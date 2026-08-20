@@ -43,7 +43,7 @@ export default function LoginPage() {
           <span className="eyebrow dark">AREA RESTRITA</span>
           <h2>Bem-vindo de volta</h2>
           <p className="muted">Entre com seu acesso para abrir o painel.</p>
-          <label>E-mail<input name="email" type="email" autoComplete="username" required placeholder="voce@empresa.com.br" /></label>
+          <label>Usuário de acesso<input name="email" type="text" autoComplete="username" required placeholder="Digite seu usuário" /></label>
           <label>Senha<input name="password" type="password" autoComplete="current-password" required placeholder="Sua senha" /></label>
           {error && <div className="form-error">{error}</div>}
           <button className="primary-button" disabled={loading}>{loading ? "Entrando..." : <>Entrar no painel <ArrowRight size={18} /></>}</button>
