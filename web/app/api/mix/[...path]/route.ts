@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
+import { COOKIE_NAME, verifySession } from "@/lib/session";
 
 export const runtime = "nodejs";
 const validStatus = new Set(["pendente", "processando", "concluido", "erro", "cancelado"]);
@@ -29,6 +30,8 @@ async function forward(request: NextRequest, path: string[]) {
 async function handler(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   try {
+    const session = await verifySession(request.cookies.get(COOKIE_NAME)?.value);
+    if (!session) return NextResponse.json({ detail: "Sessao expirada." }, { status: 401 });
     const proxied = await forward(request, path);
     if (proxied) return proxied;
     if (path[0] !== "v1") return NextResponse.json({ detail: "Rota nao encontrada." }, { status: 404 });
@@ -104,7 +107,7 @@ async function handler(request: NextRequest, context: { params: Promise<{ path: 
         const templateResult = await client.query("SELECT id, nome FROM public.templates WHERE id=$1", [Number(body.template_id)]);
         if (!templateResult.rowCount) throw new Error("Template nao encontrado.");
         const batchId = crypto.randomUUID();
-        await client.query("INSERT INTO public.api_lotes (id,template_id,origem,solicitado_por) VALUES ($1,$2,$3,$4)", [batchId, body.template_id, String(body.origem || "Painel web").slice(0,120), String(body.solicitado_por || "").slice(0,120)]);
+        await client.query("INSERT INTO public.api_lotes (id,template_id,origem,solicitado_por) VALUES ($1,$2,$3,$4)", [batchId, body.template_id, String(body.origem || "Painel web").slice(0,120), session.email.slice(0,120)]);
         const jobs = [];
         for (const cnpj of cnpjs) {
           let job = (await client.query("SELECT id,status FROM public.fila_execucao WHERE cnpj=$1 AND template_id=$2 AND status IN ('pendente','processando') ORDER BY id DESC LIMIT 1", [cnpj, body.template_id])).rows[0];

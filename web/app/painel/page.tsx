@@ -10,6 +10,7 @@ type Job = { id: number; cnpj: string; status: Status; tentativas: number; mensa
 const statusLabel: Record<Status, string> = { pendente: "Pendente", processando: "Processando", concluido: "Concluido", erro: "Erro", cancelado: "Cancelado" };
 const formatCnpj = (value: string) => value.replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 const formatDate = (value?: string) => value ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "—";
+const parseCnpjs = (value: string) => [...new Set(value.split(/[\s,;]+/).map((item) => item.replace(/\D/g, "")).filter(Boolean))];
 
 export default function PainelPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -19,6 +20,7 @@ export default function PainelPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Status | "">("");
   const [notice, setNotice] = useState("");
+  const [cnpjText, setCnpjText] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,11 +41,15 @@ export default function PainelPage() {
   async function createBatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const cnpjs = String(form.get("cnpjs") || "").split(/[\s,;]+/).map((item) => item.replace(/\D/g, "")).filter(Boolean);
-    const response = await fetch("/api/mix/v1/lotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template_id: Number(form.get("template_id")), cnpjs, origem: "Painel web", solicitado_por: form.get("solicitado_por") }) });
+    const cnpjs = parseCnpjs(cnpjText);
+    const tamanhosInvalidos = cnpjs.filter((cnpj) => cnpj.length !== 14);
+    if (!cnpjs.length) return setNotice("Informe pelo menos um CNPJ.");
+    if (tamanhosInvalidos.length) return setNotice(`${tamanhosInvalidos.length} CNPJ(s) não possuem exatamente 14 dígitos.`);
+    const response = await fetch("/api/mix/v1/lotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template_id: Number(form.get("template_id")), cnpjs, origem: "Painel web" }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) return setNotice(result.detail || "Nao foi possivel criar o lote.");
     setNotice(`Lote criado com ${result.quantidade} empresa(s). O worker iniciara o processamento.`);
+    setCnpjText("");
     setShowNew(false);
     await load();
   }
@@ -78,7 +84,7 @@ export default function PainelPage() {
         </section>
       </main>
 
-      {showNew && <div className="modal-backdrop" onMouseDown={() => setShowNew(false)}><form className="modal" onSubmit={createBatch} onMouseDown={(e) => e.stopPropagation()}><div className="modal-title"><div><span className="eyebrow dark">NOVA EXECUCAO</span><h2>Criar lote</h2></div><button type="button" onClick={() => setShowNew(false)}><XCircle /></button></div><label>Template<select name="template_id" required defaultValue=""><option value="" disabled>Selecione um template</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label><label>CNPJs<textarea name="cnpjs" rows={7} required placeholder={"Cole um ou varios CNPJs\nSepare por linha, virgula ou espaco"} /></label><label>Solicitado por<input name="solicitado_por" type="email" required placeholder="voce@empresa.com.br" /></label><button className="primary-button">Enviar para processamento <ChevronRight size={18} /></button></form></div>}
+      {showNew && <div className="modal-backdrop" onMouseDown={() => setShowNew(false)}><form className="modal" onSubmit={createBatch} onMouseDown={(e) => e.stopPropagation()}><div className="modal-title"><div><span className="eyebrow dark">NOVA EXECUCAO</span><h2>Criar lote</h2></div><button type="button" onClick={() => setShowNew(false)}><XCircle /></button></div><label>Template<select name="template_id" required defaultValue=""><option value="" disabled>Selecione um template</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label><label>CNPJs<textarea name="cnpjs" rows={7} required inputMode="numeric" value={cnpjText} onChange={(event) => setCnpjText(event.target.value)} onBlur={() => setCnpjText(parseCnpjs(cnpjText).join("\n"))} placeholder={"Cole um ou vários CNPJs\nAceita pontos, barra e hífen"} /></label><div className={`cnpj-counter ${parseCnpjs(cnpjText).some((cnpj) => cnpj.length !== 14) ? "invalid" : ""}`}><strong>{parseCnpjs(cnpjText).length}</strong> CNPJ(s) identificado(s){parseCnpjs(cnpjText).some((cnpj) => cnpj.length !== 14) && " — existe item com quantidade diferente de 14 dígitos"}</div><button className="primary-button">Enviar para processamento <ChevronRight size={18} /></button></form></div>}
     </div>
   );
 }
