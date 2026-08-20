@@ -26,8 +26,8 @@ export async function ensureUsers() {
   const email = process.env.APP_MIX_ADMIN_EMAIL;
   const password = process.env.APP_MIX_ADMIN_PASSWORD;
   if (email && password) {
-    const exists = await query("SELECT 1 FROM public.web_users WHERE LOWER(email)=LOWER($1)", [email]);
-    if (!exists.rowCount) await query("INSERT INTO public.web_users (nome,email,password_hash) VALUES ($1,$2,$3)", ["Administrador", email.toLowerCase(), await hashPassword(password)]);
+    const users = await query("SELECT 1 FROM public.web_users LIMIT 1");
+    if (!users.rowCount) await query("INSERT INTO public.web_users (nome,email,password_hash) VALUES ($1,$2,$3)", ["Administrador", email.toLowerCase(), await hashPassword(password)]);
   }
 }
 
