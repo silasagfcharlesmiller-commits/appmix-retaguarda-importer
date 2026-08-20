@@ -7,10 +7,11 @@ Painel Next.js para criar e acompanhar lotes processados pelo worker Python.
 1. Execute `npm install`.
 2. Execute `npm run dev`.
 3. Abra `http://localhost:3000`.
-4. No desenvolvimento local, use `admin@appmix.local` / `appmix2026`.
+4. Use o mesmo usuário e senha cadastrados para o painel web.
 
-Em modo local, o banco e lido de `../config_mix.json`. Essas facilidades sao
-desativadas automaticamente no build de producao, que exige todas as variaveis.
+Em modo local, o banco e lido de `../config_mix.json`. O primeiro usuário é
+criado em produção pelas variáveis administrativas e depois pode alterar nome
+e senha na tela Perfil. O login local usa esse mesmo usuário salvo no banco.
 
 Sem `APP_MIX_API_URL`, as rotas de servidor usam `DATABASE_URL` diretamente.
 Quando o FastAPI estiver publicado na VM, informe `APP_MIX_API_URL` e

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Clock3, FilePlus2, LayoutDashboard, LogOut, Menu, RefreshCw, Search, Sparkles, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Clock3, FilePlus2, LayoutDashboard, LogOut, Menu, RefreshCw, Search, Settings2, Sparkles, UserRound, XCircle } from "lucide-react";
 
 type Status = "pendente" | "processando" | "concluido" | "erro" | "cancelado";
 type Template = { id: number; nome: string };
@@ -54,7 +54,7 @@ export default function PainelPage() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand"><span className="brand-mark"><Sparkles size={20} /></span><span>APP MIX</span></div>
-        <nav><a className="active"><LayoutDashboard size={19} /> Visao geral</a><a onClick={() => setFilter("pendente")}><Clock3 size={19} /> Fila</a><a onClick={() => setFilter("concluido")}><CheckCircle2 size={19} /> Historico</a></nav>
+        <nav><a className="active" href="/painel"><LayoutDashboard size={19} /> Visao geral</a><a onClick={() => setFilter("pendente")}><Clock3 size={19} /> Fila</a><a onClick={() => setFilter("concluido")}><CheckCircle2 size={19} /> Historico</a><a href="/painel/templates"><Settings2 size={19}/> Templates</a><a href="/painel/perfil"><UserRound size={19}/> Perfil e senha</a></nav>
         <div className="worker-card"><span className="pulse" /><div><strong>Worker</strong><small>Verifique o notebook</small></div></div>
         <button className="logout" onClick={logout}><LogOut size={18} /> Sair</button>
       </aside>

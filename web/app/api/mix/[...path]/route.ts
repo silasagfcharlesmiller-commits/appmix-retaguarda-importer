@@ -34,8 +34,52 @@ async function handler(request: NextRequest, context: { params: Promise<{ path: 
     if (path[0] !== "v1") return NextResponse.json({ detail: "Rota nao encontrada." }, { status: 404 });
 
     if (request.method === "GET" && path[1] === "templates") {
+      if (path[2]) {
+        const template = await query("SELECT id,nome,criado_em,atualizado_em FROM public.templates WHERE id=$1", [Number(path[2])]);
+        if (!template.rowCount) return NextResponse.json({ detail:"Template nao encontrado." }, { status:404 });
+        const sections = await query<{ chave:string; dados_json:unknown }>("SELECT chave,dados_json FROM public.template_secoes WHERE template_id=$1", [Number(path[2])]);
+        return NextResponse.json({ ...template.rows[0], dados:Object.fromEntries(sections.rows.map((item) => [item.chave,item.dados_json])) });
+      }
       const result = await query("SELECT id, nome, criado_em, atualizado_em FROM public.templates ORDER BY nome");
       return NextResponse.json({ items: result.rows });
+    }
+
+    if (request.method === "POST" && path[1] === "templates" && !path[2]) {
+      const body = await request.json();
+      const nome = String(body.nome || "").trim();
+      if (nome.length < 2 || nome.length > 100) return NextResponse.json({ detail:"Nome deve ter entre 2 e 100 caracteres." }, { status:422 });
+      const created = await transaction(async (client) => {
+        const result = await client.query("INSERT INTO public.templates (nome) VALUES ($1) RETURNING id,nome", [nome]);
+        const id = result.rows[0].id;
+        if (body.copiar_de) await client.query("INSERT INTO public.template_secoes (template_id,chave,dados_json) SELECT $1,chave,dados_json FROM public.template_secoes WHERE template_id=$2", [id,Number(body.copiar_de)]);
+        else {
+          const fields = { view_nome:"",view_sql:"",tmp_nome:"",tmp_delete:"",flag1:false,flag2:false,flag3:false,tmp_insert:"",tmp_values:"",tmp_selectwhere:"" };
+          const tables = Object.fromEntries(["pis_cofins","icms_saida","icms_entrada","ibs_cbs"].map((key) => [key,{...fields}]));
+          for (const [key,data] of Object.entries({ tabelas:tables, comparar_divergencia:{}, excecoes_produtos:{} })) await client.query("INSERT INTO public.template_secoes (template_id,chave,dados_json) VALUES ($1,$2,$3::jsonb)", [id,key,JSON.stringify(data)]);
+        }
+        return result.rows[0];
+      });
+      return NextResponse.json(created,{status:201});
+    }
+
+    if (request.method === "PUT" && path[1] === "templates" && path[2]) {
+      const body = await request.json();
+      const allowed = ["tabelas","comparar_divergencia","excecoes_produtos"];
+      if (!body.dados || typeof body.dados !== "object") return NextResponse.json({detail:"Dados invalidos."},{status:422});
+      await transaction(async (client) => {
+        const exists = await client.query("SELECT 1 FROM public.templates WHERE id=$1",[Number(path[2])]);
+        if (!exists.rowCount) throw new Error("Template nao encontrado.");
+        for (const key of allowed) if (body.dados[key] !== undefined) await client.query("INSERT INTO public.template_secoes (template_id,chave,dados_json) VALUES ($1,$2,$3::jsonb) ON CONFLICT(template_id,chave) DO UPDATE SET dados_json=EXCLUDED.dados_json",[Number(path[2]),key,JSON.stringify(body.dados[key])]);
+        await client.query("UPDATE public.templates SET atualizado_em=NOW() WHERE id=$1",[Number(path[2])]);
+      });
+      return NextResponse.json({ok:true});
+    }
+
+    if (request.method === "DELETE" && path[1] === "templates" && path[2]) {
+      const used = await query("SELECT 1 FROM public.fila_execucao WHERE template_id=$1 AND status IN ('pendente','processando') LIMIT 1",[Number(path[2])]);
+      if (used.rowCount) return NextResponse.json({detail:"Template possui trabalhos pendentes ou em processamento."},{status:409});
+      const result = await query("DELETE FROM public.templates WHERE id=$1 RETURNING id",[Number(path[2])]);
+      return result.rowCount ? NextResponse.json({ok:true}) : NextResponse.json({detail:"Template nao encontrado."},{status:404});
     }
 
     if (request.method === "GET" && path[1] === "jobs" && !path[2]) {
@@ -83,3 +127,5 @@ async function handler(request: NextRequest, context: { params: Promise<{ path: 
 
 export const GET = handler;
 export const POST = handler;
+export const PUT = handler;
+export const DELETE = handler;
