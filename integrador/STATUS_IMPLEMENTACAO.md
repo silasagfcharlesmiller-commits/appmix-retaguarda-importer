@@ -33,7 +33,7 @@ reativa todas elas. Scripts e logs ficam junto do executável, e o monitor aceit
 ou outro nome que contenha `integrador`. Se houver somente um EXE de aplicação na pasta,
 ele também pode ter qualquer outro nome.
 
-O Painel Mix usa linhas CRLF reais, sem BOM, e solicita elevação administrativa ao ser aberto.
+O Painel Mix usa quebras de linha reais, sem BOM, e solicita elevação administrativa ao ser aberto.
 Há um teste que impede publicar novamente o BAT com sequências `\n` literais.
 
 O monitor agora executa o atualizador antes de verificar o processo. A versão `1.0.1`
@@ -53,8 +53,8 @@ e o instalador exibem a versão instalada.
   embutidos correspondem aos arquivos de origem;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.331.834 bytes;
-- SHA-256: `B8BFC43FFA5BE1C49BC4156740904538C5327191F5CF22D8CA727C405D56E2E9`;
+- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.332.886 bytes;
+- SHA-256: `F9F2CCBA15CFEE2A61A03899A2595A657762DCB0DB00E6E0A16BED5550DFFF17`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 

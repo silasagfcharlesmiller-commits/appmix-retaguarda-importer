@@ -2,7 +2,7 @@
     "schema":  2,
     "version":  "1.0.1",
     "channel":  "stable",
-    "published_at":  "2026-09-09T18:12:59.3552841+00:00",
+    "published_at":  "2026-09-09T18:18:40.4066538+00:00",
     "executable":  {
                        "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.0.1",
                        "sha256":  "EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8",
@@ -18,8 +18,8 @@
                   {
                       "name":  "Painel_Mix.bat",
                       "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/Painel_Mix.bat?v=1.0.1",
-                      "sha256":  "B7C58C2AB07E0501849861923B163AF3AC26C336E43D1ADFAC7A6EEF552E4087",
-                      "size":  8545
+                      "sha256":  "98C514C8DBDF07E481813050F8A529B8F2055FAD572183A3B3E0F24CA897A4E8",
+                      "size":  8331
                   },
                   {
                       "name":  "monitor_mix.ps1",
