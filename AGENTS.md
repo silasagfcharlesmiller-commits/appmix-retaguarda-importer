@@ -27,6 +27,10 @@
 - A aplicação Vercel está em `web/`, embora os vínculos locais também possam existir na
   raiz. O projeto se chama `appmix-retaguarda-importer` e o deploy de produção ocorre pelo
   push da branch `main` no GitHub.
+- Antes de qualquer push em `main`, execute `git status --short -- web`. Todo push recompila
+  o site completo, inclusive quando o commit altera apenas o Integrador. Se a versão que está
+  em produção veio de um deploy local e ainda aparece como modificada ou não rastreada em
+  `web`, revise e versione esses arquivos antes do push para não republicar uma versão antiga.
 - Os arquivos públicos do atualizador devem permanecer em
   `web/public/integrador-updates/` e o instalador em `web/public/downloads/`.
 - Não execute `vercel --prod` na raiz. O `.vercelignore` local exclui executáveis e um

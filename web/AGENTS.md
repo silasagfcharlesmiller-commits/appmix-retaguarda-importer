@@ -14,6 +14,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - O projeto vinculado se chama `appmix-retaguarda-importer`.
 - O deploy de produção é disparado pelo push da branch `main`; não execute
   `vercel --prod` a partir da raiz do repositório.
+- Antes de qualquer push em `main`, confira `git status --short -- web`. Um commit de outra
+  área também dispara um rebuild completo; código local do site ainda não rastreado será
+  substituído pela versão antiga do GitHub no novo deploy.
 - O atualizador do Integrador depende dos arquivos rastreados em
   `public/integrador-updates/` e `public/downloads/`. Preserve esses diretórios no build.
 - Para publicar uma nova versão do Integrador, siga `../integrador/PUBLICACAO.md` e rode o

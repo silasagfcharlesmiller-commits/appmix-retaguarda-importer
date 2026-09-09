@@ -78,6 +78,16 @@ web/public/integrador-updates/version.json
 web/public/downloads/Instalador-Mix-Fiscal.exe
 ```
 
+Antes do push, execute também:
+
+```powershell
+git status --short -- web
+```
+
+Todo push em `main` recompila o site completo. Se houver páginas ou rotas locais que já foram
+publicadas manualmente, mas ainda não estão no GitHub, um push somente do Integrador fará a
+Vercel voltar ao código antigo. Revise e versione primeiro a versão correta de `web`.
+
 Depois do commit, execute:
 
 ```powershell
