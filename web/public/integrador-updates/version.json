@@ -1,8 +1,8 @@
-﻿{
+{
     "schema":  1,
     "version":  "1.0.0",
     "channel":  "stable",
-    "published_at":  "2026-09-09T11:11:32.3395374+00:00",
+    "published_at":  "2026-09-09T11:19:43.4676006+00:00",
     "executable":  {
                        "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.0.0",
                        "sha256":  "EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8",

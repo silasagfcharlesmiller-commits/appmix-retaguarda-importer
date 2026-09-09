@@ -47,8 +47,8 @@ do painel.
   `integrador_version.json` e o driver Playwright;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.329.128 bytes;
-- SHA-256: `1E29F2924E3B2F553FB801DFB1F0292936B36003F4844517011184D212F04BC9`;
+- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.329.892 bytes;
+- SHA-256: `0B4E00DD543BDCFCEEC528BBA02E2BBFB889C5690A3455E31CD06B90FC76880F`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 

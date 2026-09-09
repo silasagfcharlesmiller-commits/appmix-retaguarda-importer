@@ -41,7 +41,12 @@ try {
     }
 
     $cacheBuster = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    $manifest = Invoke-RestMethod -Uri "$manifestUrl?t=$cacheBuster" -Method Get -TimeoutSec 30
+    $manifestResponse = Invoke-RestMethod -Uri "$manifestUrl?t=$cacheBuster" -Method Get -TimeoutSec 30
+    if ($manifestResponse -is [string]) {
+        $manifest = $manifestResponse.TrimStart([char]0xFEFF) | ConvertFrom-Json
+    } else {
+        $manifest = $manifestResponse
+    }
     $remoteVersion = [version]([string]$manifest.version)
     if ($remoteVersion -le $localVersion) { return }
 
@@ -90,12 +95,15 @@ try {
     try {
         [System.IO.File]::Replace($download, $target, $backup, $true)
         $versionTemp = "$versionFile.tmp"
-        @{
+        $versionJson = @{
             version = [string]$manifest.version
             channel = [string]$manifest.channel
             installed_at = [DateTimeOffset]::UtcNow.ToString('o')
             sha256 = $actualHash
-        } | ConvertTo-Json | Set-Content -LiteralPath $versionTemp -Encoding UTF8
+        } | ConvertTo-Json
+        [System.IO.File]::WriteAllText(
+            $versionTemp, $versionJson, [System.Text.UTF8Encoding]::new($false)
+        )
         if (Test-Path -LiteralPath $versionFile) {
             [System.IO.File]::Replace($versionTemp, $versionFile, $null, $true)
         } else {

@@ -35,9 +35,15 @@ $manifest = [ordered]@{
         size = $size
     }
 }
-$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $publicUpdate 'version.json') -Encoding UTF8
-@{version = $Versao; channel = 'stable'} | ConvertTo-Json |
-    Set-Content -LiteralPath (Join-Path $root 'integrador_version.json') -Encoding UTF8
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$manifestJson = $manifest | ConvertTo-Json -Depth 4
+[System.IO.File]::WriteAllText(
+    (Join-Path $publicUpdate 'version.json'), $manifestJson, $utf8NoBom
+)
+$localVersionJson = @{version = $Versao; channel = 'stable'} | ConvertTo-Json
+[System.IO.File]::WriteAllText(
+    (Join-Path $root 'integrador_version.json'), $localVersionJson, $utf8NoBom
+)
 
 & (Join-Path $root 'GERAR_INSTALADOR.ps1') -SkipDependencies
 Copy-Item -LiteralPath (Join-Path $root 'entrega\Instalador-Mix-Fiscal.exe') `
