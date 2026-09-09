@@ -11,6 +11,16 @@ from instalador_core import (InstallError, MixApi, atomic_json, generate_machine
 
 
 class InstallerTests(unittest.TestCase):
+    def test_panel_batch_has_real_lines_and_monitor_actions(self):
+        panel = (Path(__file__).parent / "Painel_Mix.bat").read_bytes()
+        self.assertGreater(panel.count(b"\n"), 150)
+        self.assertNotIn(b"\\n", panel)
+        self.assertIn(b"MONITORAR INTEGRADOR", panel)
+        self.assertIn(b"PARAR MONITORAMENTO", panel)
+        self.assertIn(b"atualizador_mix.ps1", panel)
+        self.assertIn(b"--install-monitor", panel)
+        self.assertIn(b"RESULTADO_TAREFA", panel)
+
     def test_cnpj_check_digits(self):
         self.assertEqual(normalize_cnpj("52.703.958/0001-42"), "52703958000142")
         for value in ("52703958000143", "00000000000000", "123"):

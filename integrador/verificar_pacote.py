@@ -31,7 +31,13 @@ def main() -> int:
             raise RuntimeError(
                 f"Entrada {name!r} possui {len(data)} bytes; esperado: {entry[2]}."
             )
-        if name in {"desktop-integrador.exe", r"playwright\driver\node.exe"}:
+        if name in {
+            "Painel_Mix.bat",
+            "atualizador_mix.ps1",
+            "desktop-integrador.exe",
+            "integrador_version.json",
+            r"playwright\driver\node.exe",
+        }:
             extracted[name] = data
 
     required = {
@@ -48,6 +54,15 @@ def main() -> int:
     source_integrator = (root / "desktop-integrador.exe").read_bytes()
     if sha256(extracted["desktop-integrador.exe"]) != sha256(source_integrator):
         raise RuntimeError("O Integrador embutido difere do arquivo de origem.")
+
+    for asset_name in ("Painel_Mix.bat", "atualizador_mix.ps1", "integrador_version.json"):
+        source_asset = (root / asset_name).read_bytes()
+        if sha256(extracted[asset_name]) != sha256(source_asset):
+            raise RuntimeError(f"O arquivo {asset_name} embutido difere da origem.")
+
+    panel = extracted["Painel_Mix.bat"]
+    if panel.count(b"\n") < 150 or b"\\n" in panel:
+        raise RuntimeError("O Painel_Mix.bat nao possui quebras de linha validas.")
 
     source_node = (
         Path(sys.executable).resolve().parent.parent

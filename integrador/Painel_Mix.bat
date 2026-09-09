@@ -1,1 +1,222 @@
-@echo off\n:: ==============================================================================\n:: PAINEL DE CONTROLE MIX FISCAL - MONITOR AUTOMATICO DINAMICO E INVISIVEL\n:: ==============================================================================\n\n:: Verifica Permissoes de Administrador\nnet session >nul 2>&1\nif %errorLevel% neq 0 (\n    echo.\n    echo ERRO: ACESSO NEGADO!\n    echo Execute este arquivo clicando com o BOTAO DIREITO e "Executar como Administrador".\n    echo.\n    pause\n    exit /b\n)\n\n:: Pega o caminho absoluto da pasta onde ESTE arquivo .bat esta localizado\nset "PASTA_ATUAL=%~dp0"\nif "%PASTA_ATUAL:~-1%"=="\" set "PASTA_ATUAL=%PASTA_ATUAL:~0,-1%"\n\n:: Definicao das variaveis padrao\nset "PASTA_MIX=%PASTA_ATUAL%"\nset "NOME_EXE="\nif exist "%PASTA_MIX%\desktop-integrador.exe" set "NOME_EXE=desktop-integrador.exe"\nif not defined NOME_EXE (\n    for %%F in ("%PASTA_MIX%\*integrador*.exe") do (\n        if not defined NOME_EXE if exist "%%~fF" set "NOME_EXE=%%~nxF"\n    )\n)\nif not defined NOME_EXE (\n    for %%F in ("%PASTA_MIX%\*.exe") do (\n        if /I not "%%~nxF"=="Instalador-Mix-Fiscal.exe" if not defined NOME_EXE if exist "%%~fF" set "NOME_EXE=%%~nxF"\n    )\n)\nif not defined NOME_EXE set "NOME_EXE=desktop-integrador.exe"\nset "NOME_PROCESSO=%NOME_EXE:.exe=%"\nset "NOME_TAREFA=Mix Fiscal - Monitorar Integrador"\n\n:MENU\ncls\necho ==============================================================================\necho                PAINEL DE CONTROLE - MONITOR MIX FISCAL     1\necho ==============================================================================\necho Configuracao Detectada Automaticamente:\necho   [1] Caminho da Pasta : %PASTA_MIX%\necho   [2] Nome do Executavel: %NOME_EXE%\necho   [3] Nome do Processo  : %NOME_PROCESSO%\necho   [4] Nome da Tarefa    : %NOME_TAREFA%\necho ==============================================================================\necho ESCOLHA UMA OPCAO:\necho.\necho   [1] Alterar Pasta / Executavel Manualmente\necho   [2] MONITORAR INTEGRADOR - Instalar / ativar (a cada 5 min)\necho   [3] INICIAR Integrador Agora\necho   [4] PARAR Integrador e Limpar Processos Travados\necho   [5] PARAR MONITORAMENTO (para manutencao)\necho   [6] Ver Status / Testar Execucao Agora\necho   [0] Sair\necho ==============================================================================\nset /p opcao="Digite o numero da opcao desejada e aperte Enter: "\n\nif "%opcao%"=="1" goto ALTERAR_CONFIG\nif "%opcao%"=="2" goto INSTALAR\nif "%opcao%"=="3" goto INICIAR\nif "%opcao%"=="4" goto PARAR\nif "%opcao%"=="5" goto DESINSTALAR\nif "%opcao%"=="6" goto STATUS\nif "%opcao%"=="0" exit /b\n\necho.\necho Opcao invalida!\ntimeout /t 2 >nul\ngoto MENU\n\n:ALTERAR_CONFIG\ncls\necho ==============================================================================\necho                     ALTERAR CONFIGURACOES DE CAMINHO\necho ==============================================================================\necho.\nset /p PASTA_MIX="1. Nova Pasta (Atual: %PASTA_MIX%): "\nset /p NOME_EXE="2. Novo Executavel (Atual: %NOME_EXE%): "\nset "NOME_PROCESSO=%NOME_EXE:.exe=%"\necho.\necho Configuracao atualizada!\npause\ngoto MENU\n\n:GERAR_SCRIPTS\nif not exist "%PASTA_MIX%" (\n    mkdir "%PASTA_MIX%"\n)\n\n:: 1. Gera o Script PowerShell de monitoramento\nset "SCRIPT_PS1=%PASTA_MIX%\monitor_mix.ps1"\n(\n    echo $pastaMix       = "%PASTA_MIX%"\n    echo $nomeExecutavel = "%NOME_EXE%"\n    echo $nomeProcesso   = "%NOME_PROCESSO%"\n    echo $arquivoLog     = "monitor_log.txt"\n    echo $atualizador    = Join-Path -Path $pastaMix -ChildPath "atualizador_mix.ps1"\n    echo if ^(Test-Path -LiteralPath $atualizador^) { ^& $atualizador }\n    echo $caminhoCompletoExe = Join-Path -Path $pastaMix -ChildPath $nomeExecutavel\n    echo $caminhoCompletoLog = Join-Path -Path $pastaMix -ChildPath $arquivoLog\n    echo $processoRodando = Get-Process -Name $nomeProcesso -ErrorAction SilentlyContinue\n    echo if ^(-not $processoRodando^) {\n    echo     $dataHora = Get-Date -Format "dd/MM/yyyy HH:mm:ss"\n    echo     $mensagemLog = "[$dataHora] ALERTA: O integrador nao estava rodando. Reiniciando..."\n    echo     Add-Content -Path $caminhoCompletoLog -Value $mensagemLog -Encoding UTF8\n    echo     Start-Process -FilePath $caminhoCompletoExe -WorkingDirectory $pastaMix\n    echo }\n) > "%SCRIPT_PS1%"\n\n:: 2. Gera o Lancador VBScript para rodar o PowerShell em modo 100% Oculto\nset "SCRIPT_VBS=%PASTA_MIX%\run_silent.vbs"\n(\n    echo Set objShell = CreateObject("WScript.Shell"^)\n    echo objShell.Run "powershell.exe -ExecutionPolicy Bypass -NoProfile -File """ ^& "%PASTA_MIX%\monitor_mix.ps1" ^& """", 0, False\n) > "%SCRIPT_VBS%"\nexit /b\n\n:INSTALAR\ncls\necho ==============================================================================\necho                    MONITORAR INTEGRADOR\necho ==============================================================================\necho.\necho [1/2] Gerando scripts dinamicamente em: %PASTA_MIX%...\ncall :GERAR_SCRIPTS\n\necho [2/2] Cadastrando tarefa silenciosa no Agendador do Windows...\nschtasks /delete /tn "%NOME_TAREFA%" /f >nul 2>&1\n\n:: Utiliza wscript.exe para chamar o VBS em segundo plano\nschtasks /create /tn "%NOME_TAREFA%" /tr "wscript.exe \"%PASTA_MIX%\run_silent.vbs\"" /sc minute /mo 5 /ru "%USERNAME%" /rl HIGHEST /f\n\n:: Reativa tambem as tarefas nativas criadas pelo Integrador.\nschtasks /change /tn "\MixFiscalIntegrador\BootStart" /enable >nul 2>&1\nschtasks /change /tn "\MixFiscalIntegrador\Startup" /enable >nul 2>&1\nschtasks /change /tn "\MixFiscalIntegrador\Watchdog" /enable >nul 2>&1\n\nif %errorLevel% equ 0 (\n    echo.\n    echo SUCESSO! Monitoramento ativado para o caminho:\n    echo %PASTA_MIX%\n    echo.\n    echo As verificacoes serao 100%% INVISIVEIS (sem piscar tela).\n) else (\n    echo.\n    echo ERRO ao cadastrar a tarefa agendada.\n)\necho.\npause\ngoto MENU\n\n:INICIAR\ncls\nif exist "%PASTA_MIX%\%NOME_EXE%" (\n    start "" /d "%PASTA_MIX%" "%PASTA_MIX%\%NOME_EXE%"\n    echo Executavel disparado com sucesso.\n) else (\n    echo ERRO: Arquivo nao encontrado em: %PASTA_MIX%\%NOME_EXE%\n)\necho.\npause\ngoto MENU\n\n:PARAR\ncls\necho Encerrando processos do Integrador e WebView2...\ntaskkill /f /im "%NOME_EXE%" >nul 2>&1\ntaskkill /f /im msedgewebview2.exe >nul 2>&1\necho Processos encerrados.\necho.\npause\ngoto MENU\n\n:DESINSTALAR\ncls\nschtasks /end /tn "%NOME_TAREFA%" >nul 2>&1\nschtasks /delete /tn "%NOME_TAREFA%" /f >nul 2>&1\nschtasks /change /tn "\MixFiscalIntegrador\BootStart" /disable >nul 2>&1\nschtasks /change /tn "\MixFiscalIntegrador\Startup" /disable >nul 2>&1\nschtasks /change /tn "\MixFiscalIntegrador\Watchdog" /disable >nul 2>&1\nif exist "%PASTA_MIX%\run_silent.vbs" del /f /q "%PASTA_MIX%\run_silent.vbs"\necho Monitoramento extra e tarefas nativas desativados.\necho Agora use a opcao 4 para parar o Integrador antes da manutencao.\necho.\npause\ngoto MENU\n\n:STATUS\ncls\necho ==============================================================================\necho                      STATUS DO PROCESSO E MONITOR\necho ==============================================================================\necho.\ntasklist /fi "IMAGENAME eq %NOME_EXE%" 2>NUL | findstr /I "%NOME_EXE%" >nul\nif %errorlevel% equ 0 (\n    echo [RODANDO] O %NOME_EXE% esta em execucao.\n) else (\n    echo [PARADO] O %NOME_EXE% NAO esta rodando no momento.\n)\n\nschtasks /query /tn "%NOME_TAREFA%" >nul 2>&1\nif %errorlevel% equ 0 (\n    echo [ATIVO] O Monitor do Windows esta instalado.\n) else (\n    echo [INATIVO] O Monitor do Windows nao esta instalado.\n)\necho.\npause\ngoto MENU\n
+@echo off
+:: ==============================================================================
+:: PAINEL DE CONTROLE MIX FISCAL - MONITOR AUTOMATICO DINAMICO E INVISIVEL
+:: ==============================================================================
+
+:: Verifica Permissoes de Administrador
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -WorkingDirectory '%~dp0' -Verb RunAs"
+    if errorlevel 1 (
+        echo.
+        echo ERRO: nao foi possivel solicitar permissao de administrador.
+        echo Clique com o BOTAO DIREITO e escolha "Executar como administrador".
+        echo.
+        pause
+    )
+    exit /b
+)
+
+:: Pega o caminho absoluto da pasta onde ESTE arquivo .bat esta localizado
+set "PASTA_ATUAL=%~dp0"
+if "%PASTA_ATUAL:~-1%"=="\" set "PASTA_ATUAL=%PASTA_ATUAL:~0,-1%"
+
+:: Definicao das variaveis padrao
+set "PASTA_MIX=%PASTA_ATUAL%"
+set "NOME_EXE="
+if exist "%PASTA_MIX%\desktop-integrador.exe" set "NOME_EXE=desktop-integrador.exe"
+if not defined NOME_EXE (
+    for %%F in ("%PASTA_MIX%\*integrador*.exe") do (
+        if not defined NOME_EXE if exist "%%~fF" set "NOME_EXE=%%~nxF"
+    )
+)
+if not defined NOME_EXE (
+    for %%F in ("%PASTA_MIX%\*.exe") do (
+        if /I not "%%~nxF"=="Instalador-Mix-Fiscal.exe" if not defined NOME_EXE if exist "%%~fF" set "NOME_EXE=%%~nxF"
+    )
+)
+if not defined NOME_EXE set "NOME_EXE=desktop-integrador.exe"
+set "NOME_PROCESSO=%NOME_EXE:.exe=%"
+set "NOME_TAREFA=Mix Fiscal - Monitorar Integrador"
+
+if /I "%~1"=="--install-monitor" goto INSTALAR
+if /I "%~1"=="--stop-monitor" goto DESINSTALAR
+
+:MENU
+cls
+echo ==============================================================================
+echo                PAINEL DE CONTROLE - MONITOR MIX FISCAL     1
+echo ==============================================================================
+echo Configuracao Detectada Automaticamente:
+echo   [1] Caminho da Pasta : %PASTA_MIX%
+echo   [2] Nome do Executavel: %NOME_EXE%
+echo   [3] Nome do Processo  : %NOME_PROCESSO%
+echo   [4] Nome da Tarefa    : %NOME_TAREFA%
+echo ==============================================================================
+echo ESCOLHA UMA OPCAO:
+echo.
+echo   [1] Alterar Pasta / Executavel Manualmente
+echo   [2] MONITORAR INTEGRADOR - Instalar / ativar (a cada 5 min)
+echo   [3] INICIAR Integrador Agora
+echo   [4] PARAR Integrador e Limpar Processos Travados
+echo   [5] PARAR MONITORAMENTO (para manutencao)
+echo   [6] Ver Status / Testar Execucao Agora
+echo   [0] Sair
+echo ==============================================================================
+set /p opcao="Digite o numero da opcao desejada e aperte Enter: "
+
+if "%opcao%"=="1" goto ALTERAR_CONFIG
+if "%opcao%"=="2" goto INSTALAR
+if "%opcao%"=="3" goto INICIAR
+if "%opcao%"=="4" goto PARAR
+if "%opcao%"=="5" goto DESINSTALAR
+if "%opcao%"=="6" goto STATUS
+if "%opcao%"=="0" exit /b
+
+echo.
+echo Opcao invalida!
+timeout /t 2 >nul
+goto MENU
+
+:ALTERAR_CONFIG
+cls
+echo ==============================================================================
+echo                     ALTERAR CONFIGURACOES DE CAMINHO
+echo ==============================================================================
+echo.
+set /p PASTA_MIX="1. Nova Pasta (Atual: %PASTA_MIX%): "
+set /p NOME_EXE="2. Novo Executavel (Atual: %NOME_EXE%): "
+set "NOME_PROCESSO=%NOME_EXE:.exe=%"
+echo.
+echo Configuracao atualizada!
+pause
+goto MENU
+
+:GERAR_SCRIPTS
+if not exist "%PASTA_MIX%" (
+    mkdir "%PASTA_MIX%"
+)
+
+:: 1. Gera o Script PowerShell de monitoramento
+set "SCRIPT_PS1=%PASTA_MIX%\monitor_mix.ps1"
+(
+    echo $pastaMix       = "%PASTA_MIX%"
+    echo $nomeExecutavel = "%NOME_EXE%"
+    echo $nomeProcesso   = "%NOME_PROCESSO%"
+    echo $arquivoLog     = "monitor_log.txt"
+    echo $atualizador    = Join-Path -Path $pastaMix -ChildPath "atualizador_mix.ps1"
+    echo if ^(Test-Path -LiteralPath $atualizador^) { ^& $atualizador }
+    echo $caminhoCompletoExe = Join-Path -Path $pastaMix -ChildPath $nomeExecutavel
+    echo $caminhoCompletoLog = Join-Path -Path $pastaMix -ChildPath $arquivoLog
+    echo $processoRodando = Get-Process -Name $nomeProcesso -ErrorAction SilentlyContinue
+    echo if ^(-not $processoRodando^) {
+    echo     $dataHora = Get-Date -Format "dd/MM/yyyy HH:mm:ss"
+    echo     $mensagemLog = "[$dataHora] ALERTA: O integrador nao estava rodando. Reiniciando..."
+    echo     Add-Content -Path $caminhoCompletoLog -Value $mensagemLog -Encoding UTF8
+    echo     Start-Process -FilePath $caminhoCompletoExe -WorkingDirectory $pastaMix
+    echo }
+) > "%SCRIPT_PS1%"
+
+:: 2. Gera o Lancador VBScript para rodar o PowerShell em modo 100% Oculto
+set "SCRIPT_VBS=%PASTA_MIX%\run_silent.vbs"
+(
+    echo Set objShell = CreateObject("WScript.Shell"^)
+    echo objShell.Run "powershell.exe -ExecutionPolicy Bypass -NoProfile -File """ ^& "%PASTA_MIX%\monitor_mix.ps1" ^& """", 0, False
+) > "%SCRIPT_VBS%"
+exit /b
+
+:INSTALAR
+cls
+echo ==============================================================================
+echo                    MONITORAR INTEGRADOR
+echo ==============================================================================
+echo.
+echo [1/2] Gerando scripts dinamicamente em: %PASTA_MIX%...
+call :GERAR_SCRIPTS
+
+echo [2/2] Cadastrando tarefa silenciosa no Agendador do Windows...
+schtasks /delete /tn "%NOME_TAREFA%" /f >nul 2>&1
+
+:: Utiliza wscript.exe para chamar o VBS em segundo plano
+schtasks /create /tn "%NOME_TAREFA%" /tr "wscript.exe \"%PASTA_MIX%\run_silent.vbs\"" /sc minute /mo 5 /ru "%USERNAME%" /rl HIGHEST /f
+set "RESULTADO_TAREFA=%errorLevel%"
+
+:: Reativa tambem as tarefas nativas criadas pelo Integrador.
+schtasks /change /tn "\MixFiscalIntegrador\BootStart" /enable >nul 2>&1
+schtasks /change /tn "\MixFiscalIntegrador\Startup" /enable >nul 2>&1
+schtasks /change /tn "\MixFiscalIntegrador\Watchdog" /enable >nul 2>&1
+
+if %RESULTADO_TAREFA% equ 0 (
+    echo.
+    echo SUCESSO! Monitoramento ativado para o caminho:
+    echo %PASTA_MIX%
+    echo.
+    echo As verificacoes serao 100%% INVISIVEIS, sem piscar tela.
+) else (
+    echo.
+    echo ERRO ao cadastrar a tarefa agendada.
+)
+echo.
+if /I "%~1"=="--install-monitor" exit /b %RESULTADO_TAREFA%
+pause
+goto MENU
+
+:INICIAR
+cls
+if exist "%PASTA_MIX%\%NOME_EXE%" (
+    start "" /d "%PASTA_MIX%" "%PASTA_MIX%\%NOME_EXE%"
+    echo Executavel disparado com sucesso.
+) else (
+    echo ERRO: Arquivo nao encontrado em: %PASTA_MIX%\%NOME_EXE%
+)
+echo.
+pause
+goto MENU
+
+:PARAR
+cls
+echo Encerrando processos do Integrador e WebView2...
+taskkill /f /im "%NOME_EXE%" >nul 2>&1
+taskkill /f /im msedgewebview2.exe >nul 2>&1
+echo Processos encerrados.
+echo.
+pause
+goto MENU
+
+:DESINSTALAR
+cls
+schtasks /end /tn "%NOME_TAREFA%" >nul 2>&1
+schtasks /delete /tn "%NOME_TAREFA%" /f >nul 2>&1
+schtasks /change /tn "\MixFiscalIntegrador\BootStart" /disable >nul 2>&1
+schtasks /change /tn "\MixFiscalIntegrador\Startup" /disable >nul 2>&1
+schtasks /change /tn "\MixFiscalIntegrador\Watchdog" /disable >nul 2>&1
+if exist "%PASTA_MIX%\run_silent.vbs" del /f /q "%PASTA_MIX%\run_silent.vbs"
+echo Monitoramento extra e tarefas nativas desativados.
+echo Agora use a opcao 4 para parar o Integrador antes da manutencao.
+echo.
+if /I "%~1"=="--stop-monitor" exit /b 0
+pause
+goto MENU
+
+:STATUS
+cls
+echo ==============================================================================
+echo                      STATUS DO PROCESSO E MONITOR
+echo ==============================================================================
+echo.
+tasklist /fi "IMAGENAME eq %NOME_EXE%" 2>NUL | findstr /I "%NOME_EXE%" >nul
+if %errorlevel% equ 0 (
+    echo [RODANDO] O %NOME_EXE% esta em execucao.
+) else (
+    echo [PARADO] O %NOME_EXE% NAO esta rodando no momento.
+)
+
+schtasks /query /tn "%NOME_TAREFA%" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [ATIVO] O Monitor do Windows esta instalado.
+) else (
+    echo [INATIVO] O Monitor do Windows nao esta instalado.
+)
+echo.
+pause
+goto MENU

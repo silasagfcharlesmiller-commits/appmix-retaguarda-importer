@@ -26,8 +26,8 @@ existência de um ID diferente para XML ou para outra instalação do CNPJ não 
 
 ## Monitor e manutenção
 
-O instalador copia `Painel_Mix.bat` para `C:\mix fiscal\integracao`. Execute esse painel
-como administrador quando precisar fazer manutenção:
+O instalador copia `Painel_Mix.bat` para `C:\mix fiscal\integracao`. Abra esse painel quando
+precisar fazer manutenção; ele solicita automaticamente a permissão de administrador:
 
 - **2 - Monitorar Integrador**: instala ou reativa o monitor e reativa as tarefas nativas;
 - **5 - Parar Monitoramento**: remove o monitor extra e desativa `BootStart`, `Startup` e

@@ -33,6 +33,9 @@ reativa todas elas. Scripts e logs ficam junto do executável, e o monitor aceit
 ou outro nome que contenha `integrador`. Se houver somente um EXE de aplicação na pasta,
 ele também pode ter qualquer outro nome.
 
+O Painel Mix usa linhas CRLF reais, sem BOM, e solicita elevação administrativa ao ser aberto.
+Há um teste que impede publicar novamente o BAT com sequências `\n` literais.
+
 O monitor agora executa o atualizador antes de verificar o processo. A versão `1.0.0`
 consulta o manifesto público do site, aceita somente download HTTPS do domínio configurado,
 valida tamanho, SHA-256 e cabeçalho PE, mantém um backup e restaura o executável caso a
@@ -41,7 +44,7 @@ do painel.
 
 ## Validações
 
-- 12 testes locais passaram;
+- 13 testes locais passaram;
 - os três arquivos Python compilam com `py_compile`;
 - o pacote contém `desktop-integrador.exe`, `Painel_Mix.bat`, `atualizador_mix.ps1`,
   `integrador_version.json` e o driver Playwright;
@@ -49,8 +52,8 @@ do painel.
   embutidos correspondem aos arquivos de origem;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.328.667 bytes;
-- SHA-256: `31F2459CF8D1958131C4E4B4ABB72D46A4AC73640A4A7407D4A042683A89268A`;
+- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.327.802 bytes;
+- SHA-256: `5EEEBFC5790C175106C9E6D63262B3189660A441BAFAA3EB777BCB3F9480ABE9`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 
