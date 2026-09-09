@@ -2,6 +2,10 @@
 
 Painel Next.js para criar e acompanhar lotes processados pelo worker Python.
 
+## Documentacao geral
+
+Consulte [ARQUITETURA_GERAL_APP_MIX.md](./ARQUITETURA_GERAL_APP_MIX.md) para a arquitetura completa, regras de negócio, segurança, operação da VM, comparação com Playwright e estimativa de esforço do projeto.
+
 ## Desenvolvimento local
 
 1. Execute `npm install`.

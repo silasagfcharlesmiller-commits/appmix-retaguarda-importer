@@ -44,7 +44,7 @@ export default function LoginPage() {
           <span className="eyebrow dark">AREA RESTRITA</span>
           <h2>Bem-vindo de volta</h2>
           <p className="muted">Entre com seu acesso para abrir o painel.</p>
-          <label>Usuário de acesso<input name="email" type="text" autoComplete="username" required placeholder="Digite seu usuário" /></label>
+          <label>Usuário de acesso<input name="email" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} required placeholder="Digite exatamente como foi cadastrado" /><small>Maiúsculas e minúsculas fazem diferença.</small></label>
           <label>Senha<span className="password-input"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Sua senha" /><button type="button" onClick={() => setShowPassword(!showPassword)} title={showPassword ? "Ocultar senha" : "Visualizar senha"}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></span></label>
           {error && <div className="form-error">{error}</div>}
           <button className="primary-button" disabled={loading}>{loading ? "Entrando..." : <>Entrar no painel <ArrowRight size={18} /></>}</button>

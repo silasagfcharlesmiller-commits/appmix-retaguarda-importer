@@ -1,0 +1,8 @@
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { COOKIE_NAME,verifySession } from "@/lib/session";
+import { createCollaborator,getUser,listCollaborators,resetCollaboratorPassword,setCollaboratorRole,toggleCollaborator } from "@/lib/users";
+async function current(){const s=await verifySession((await cookies()).get(COOKIE_NAME)?.value);return s?getUser(s.email):null;}
+export async function GET(){const u=await current();return u?NextResponse.json({items:await listCollaborators(u),role:u.role}):NextResponse.json({detail:"Sessao expirada"},{status:401});}
+export async function POST(request:Request){const u=await current();if(!u)return NextResponse.json({detail:"Sessao expirada"},{status:401});try{const b=await request.json();return NextResponse.json(await createCollaborator(u,String(b.nome||""),String(b.email||""),String(b.password||"")),{status:201});}catch(e){return NextResponse.json({detail:e instanceof Error?e.message:"Falha ao criar colaborador"},{status:422});}}
+export async function PATCH(request:Request){const u=await current();if(!u)return NextResponse.json({detail:"Sessao expirada"},{status:401});try{const b=await request.json();if(b.action==="role")return NextResponse.json(await setCollaboratorRole(u,Number(b.id),String(b.role)));if(b.action==="reset_password")return NextResponse.json(await resetCollaboratorPassword(u,Number(b.id),String(b.password||"")));return NextResponse.json(await toggleCollaborator(u,Number(b.id),Boolean(b.ativo)));}catch(e){return NextResponse.json({detail:e instanceof Error?e.message:"Falha ao alterar colaborador"},{status:422});}}

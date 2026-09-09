@@ -1,58 +1,29 @@
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { query } from "@/lib/db";
-
 const scrypt = promisify(scryptCallback);
-
-async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const hash = (await scrypt(password, salt, 64)) as Buffer;
-  return `${salt}:${hash.toString("hex")}`;
+let usersReady: Promise<void> | null = null;
+async function hashPassword(password:string){const salt=randomBytes(16).toString("hex");const hash=(await scrypt(password,salt,64)) as Buffer;return `${salt}:${hash.toString("hex")}`;}
+async function verifyPassword(password:string,stored:string){const [salt,hex]=stored.split(":");if(!salt||!hex)return false;const expected=Buffer.from(hex,"hex"),actual=(await scrypt(password,salt,expected.length)) as Buffer;return expected.length===actual.length&&timingSafeEqual(expected,actual);}
+function validateLogin(login:string){login=login.trim();if(login.length<3||login.length>180||!/^[A-Za-z0-9][A-Za-z0-9._@-]*$/.test(login)||login.includes("--"))throw new Error("Usuario de acesso invalido.");return login;}
+function validatePassword(password:string){if(password.length<8||!/[A-Za-z]/.test(password)||!/[0-9]/.test(password)||!/[^A-Za-z0-9]/.test(password))throw new Error("A senha precisa ter 8 caracteres, letra, numero e simbolo.");}
+export type WebUser={id:number;nome:string;email:string;role:"admin"|"colaborador";owner_id:number};
+export async function ensureUsers(){
+ usersReady ??= (async()=>{
+  await query(`CREATE TABLE IF NOT EXISTS public.web_users (id SERIAL PRIMARY KEY,nome VARCHAR(100) NOT NULL,email VARCHAR(180) NOT NULL UNIQUE,password_hash TEXT NOT NULL,role VARCHAR(20) NOT NULL DEFAULT 'colaborador',owner_id INTEGER,ativo BOOLEAN NOT NULL DEFAULT TRUE,criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  for(const sql of ["ALTER TABLE public.web_users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'colaborador'","ALTER TABLE public.web_users ADD COLUMN IF NOT EXISTS owner_id INTEGER","ALTER TABLE public.web_users ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE","ALTER TABLE public.web_users ADD COLUMN IF NOT EXISTS criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()","UPDATE public.web_users SET owner_id=id WHERE owner_id IS NULL"])await query(sql);
+  const email=process.env.APP_MIX_ADMIN_EMAIL,password=process.env.APP_MIX_ADMIN_PASSWORD;
+  if(email&&password){const users=await query("SELECT 1 FROM public.web_users LIMIT 1");if(!users.rowCount){const c=await query<{id:number}>("INSERT INTO public.web_users(nome,email,password_hash,role) VALUES($1,$2,$3,'admin') RETURNING id",["Administrador",email.toLowerCase(),await hashPassword(password)]);await query("UPDATE public.web_users SET owner_id=id WHERE id=$1",[c.rows[0].id]);}}
+  await query("CREATE TABLE IF NOT EXISTS public.web_login_attempts (id BIGSERIAL PRIMARY KEY,login VARCHAR(180) NOT NULL,tentativa_em TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+ })().catch(error=>{usersReady=null;throw error;});
+ return usersReady;
 }
-
-async function verifyPassword(password: string, stored: string) {
-  const [salt, hex] = stored.split(":");
-  if (!salt || !hex) return false;
-  const expected = Buffer.from(hex, "hex");
-  const actual = (await scrypt(password, salt, expected.length)) as Buffer;
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
-}
-
-export async function ensureUsers() {
-  await query(`CREATE TABLE IF NOT EXISTS public.web_users (
-    id SERIAL PRIMARY KEY, nome VARCHAR(100) NOT NULL, email VARCHAR(180) NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL, atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )`);
-  const email = process.env.APP_MIX_ADMIN_EMAIL;
-  const password = process.env.APP_MIX_ADMIN_PASSWORD;
-  if (email && password) {
-    const users = await query("SELECT 1 FROM public.web_users LIMIT 1");
-    if (!users.rowCount) await query("INSERT INTO public.web_users (nome,email,password_hash) VALUES ($1,$2,$3)", ["Administrador", email.toLowerCase(), await hashPassword(password)]);
-  }
-}
-
-export async function authenticateUser(email: string, password: string) {
-  await ensureUsers();
-  const result = await query<{ id:number; nome:string; email:string; password_hash:string }>("SELECT id,nome,email,password_hash FROM public.web_users WHERE LOWER(email)=LOWER($1)", [email]);
-  const user = result.rows[0];
-  return user && await verifyPassword(password, user.password_hash) ? { id:user.id, nome:user.nome, email:user.email } : null;
-}
-
-export async function getUser(email: string) {
-  await ensureUsers();
-  const result = await query<{ id:number; nome:string; email:string }>("SELECT id,nome,email FROM public.web_users WHERE LOWER(email)=LOWER($1)", [email]);
-  return result.rows[0] || null;
-}
-
-export async function updateUser(email: string, login: string, currentPassword: string, newPassword?: string) {
-  const auth = await authenticateUser(email, currentPassword);
-  if (!auth) throw new Error("Senha atual incorreta.");
-  login = login.trim().toLowerCase();
-  if (login.length < 3 || login.length > 180) throw new Error("Informe um usuario de acesso valido.");
-  const duplicate = await query("SELECT 1 FROM public.web_users WHERE LOWER(email)=LOWER($1) AND id<>$2", [login, auth.id]);
-  if (duplicate.rowCount) throw new Error("Este usuario de acesso ja esta em uso.");
-  if (newPassword && (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword))) throw new Error("A nova senha precisa ter 8 caracteres, letra, numero e simbolo.");
-  if (newPassword) await query("UPDATE public.web_users SET nome=$1,email=$1,password_hash=$2,atualizado_em=NOW() WHERE id=$3", [login, await hashPassword(newPassword), auth.id]);
-  else await query("UPDATE public.web_users SET nome=$1,email=$1,atualizado_em=NOW() WHERE id=$2", [login, auth.id]);
-  return { ...auth, nome:login, email:login };
-}
+const fields="id,nome,email,role,COALESCE(owner_id,id) AS owner_id";
+export async function authenticateUser(email:string,password:string){await ensureUsers();email=email.trim().slice(0,180);const attempts=await query("SELECT COUNT(*)::int AS total FROM public.web_login_attempts WHERE login=$1 AND tentativa_em>NOW()-INTERVAL '15 minutes'",[email]);if(Number(attempts.rows[0]?.total)>=5)throw new Error("Muitas tentativas de login. Aguarde 15 minutos.");try{email=validateLogin(email);}catch{await query("INSERT INTO public.web_login_attempts(login) VALUES($1)",[email]);return null}const r=await query<WebUser&{password_hash:string}>(`SELECT ${fields},password_hash FROM public.web_users WHERE ativo=TRUE AND email=$1`,[email]);const u=r.rows[0];if(!u||!await verifyPassword(password,u.password_hash)){await query("INSERT INTO public.web_login_attempts(login) VALUES($1)",[email]);return null;}await query("DELETE FROM public.web_login_attempts WHERE login=$1",[email]);const {password_hash:_removed,...safe}=u;return safe;}
+export async function getUser(email:string){await ensureUsers();return (await query<WebUser>(`SELECT ${fields} FROM public.web_users WHERE ativo=TRUE AND email=$1`,[email])).rows[0]||null;}
+export async function updateUser(email:string,login:string,currentPassword:string,newPassword?:string){const auth=await authenticateUser(email,currentPassword);if(!auth)throw new Error("Senha atual incorreta.");login=validateLogin(login);if((await query("SELECT 1 FROM public.web_users WHERE email=$1 AND id<>$2",[login,auth.id])).rowCount)throw new Error("Este usuario de acesso ja esta em uso.");if(newPassword)validatePassword(newPassword);if(newPassword)await query("UPDATE public.web_users SET nome=$1,email=$1,password_hash=$2,atualizado_em=NOW() WHERE id=$3",[login,await hashPassword(newPassword),auth.id]);else await query("UPDATE public.web_users SET nome=$1,email=$1,atualizado_em=NOW() WHERE id=$2",[login,auth.id]);return {...auth,nome:login,email:login};}
+export async function listCollaborators(user:WebUser){if(user.role!=="admin")return [];return (await query("SELECT id,nome,email,role,ativo,criado_em FROM public.web_users WHERE owner_id=$1 AND id<>$1 ORDER BY nome",[user.owner_id])).rows;}
+export async function createCollaborator(user:WebUser,nome:string,email:string,password:string){if(user.role!=="admin")throw new Error("Somente o administrador pode criar colaboradores.");nome=nome.trim();email=validateLogin(email);if(nome.length<2)throw new Error("Informe um nome valido.");validatePassword(password);try{return (await query("INSERT INTO public.web_users(nome,email,password_hash,role,owner_id) VALUES($1,$2,$3,'colaborador',$4) RETURNING id,nome,email,role,ativo,criado_em",[nome,email,await hashPassword(password),user.owner_id])).rows[0];}catch(e){if((e as {code?:string}).code==="23505")throw new Error("Este usuario de acesso ja existe.");throw e;}}
+export async function toggleCollaborator(user:WebUser,id:number,ativo:boolean){if(user.role!=="admin")throw new Error("Somente o administrador pode alterar colaboradores.");if(id===user.id)throw new Error("Voce nao pode bloquear o proprio acesso.");const r=await query("UPDATE public.web_users SET ativo=$1,atualizado_em=NOW() WHERE id=$2 AND owner_id=$3 AND id<>$3 AND id<>$4 RETURNING id,nome,email,role,ativo,criado_em",[ativo,id,user.owner_id,user.id]);if(!r.rowCount)throw new Error("Colaborador nao encontrado ou protegido.");return r.rows[0];}
+export async function setCollaboratorRole(user:WebUser,id:number,role:string){if(user.role!=="admin")throw new Error("Somente administradores podem conceder permissoes.");if(id===user.id)throw new Error("Voce nao pode alterar a propria permissao.");if(!["admin","colaborador"].includes(role))throw new Error("Permissao invalida.");const r=await query("UPDATE public.web_users SET role=$1,atualizado_em=NOW() WHERE id=$2 AND owner_id=$3 AND id<>$3 AND id<>$4 RETURNING id,nome,email,role,ativo",[role,id,user.owner_id,user.id]);if(!r.rowCount)throw new Error("Colaborador nao encontrado ou protegido.");return r.rows[0];}
+export async function resetCollaboratorPassword(user:WebUser,id:number,password:string){if(user.role!=="admin")throw new Error("Somente administradores podem redefinir senhas.");if(id===user.id)throw new Error("Altere sua propria senha na secao Seguranca do painel.");validatePassword(password);const r=await query("UPDATE public.web_users SET password_hash=$1,atualizado_em=NOW() WHERE id=$2 AND owner_id=$3 AND id<>$3 AND id<>$4 RETURNING id,email",[await hashPassword(password),id,user.owner_id,user.id]);if(!r.rowCount)throw new Error("Colaborador nao encontrado ou protegido.");return {ok:true,id:r.rows[0].id};}

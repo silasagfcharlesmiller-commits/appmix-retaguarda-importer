@@ -3,4 +3,8 @@ node_modules/
 .env
 .env.local
 .vercel/
+vm/
 npm-debug.log*
+
+.vercel
+.env*

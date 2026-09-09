@@ -10,4 +10,4 @@ export async function proxy(request: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-export const config = { matcher: ["/painel/:path*", "/api/mix/:path*", "/api/profile/:path*"] };
+export const config = { matcher: ["/painel/:path*", "/api/mix/:path*", "/api/profile/:path*", "/api/hermes-admin/:path*"] };
