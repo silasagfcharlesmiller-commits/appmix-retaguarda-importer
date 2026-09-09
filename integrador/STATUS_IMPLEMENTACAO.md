@@ -45,10 +45,12 @@ do painel.
 - os três arquivos Python compilam com `py_compile`;
 - o pacote contém `desktop-integrador.exe`, `Painel_Mix.bat`, `atualizador_mix.ps1`,
   `integrador_version.json` e o driver Playwright;
+- as 358 entradas do CArchive foram descompactadas; o Integrador e o Node do Playwright
+  embutidos correspondem aos arquivos de origem;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.329.892 bytes;
-- SHA-256: `0B4E00DD543BDCFCEEC528BBA02E2BBFB889C5690A3455E31CD06B90FC76880F`;
+- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.328.667 bytes;
+- SHA-256: `31F2459CF8D1958131C4E4B4ABB72D46A4AC73640A4A7407D4A042683A89268A`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 

@@ -34,6 +34,9 @@ O script realiza em conjunto:
 - gera `web/public/integrador-updates/version.json` sem BOM, com versão, tamanho e SHA-256;
 - atualiza `integrador/integrador_version.json`;
 - recompila `integrador/entrega/Instalador-Mix-Fiscal.exe` como administrador;
+- descompacta todas as entradas do instalador e compara o Integrador e o Node do Playwright
+  com os arquivos de origem; um pacote corrompido é removido e o build tenta novamente, no
+  máximo três vezes;
 - copia o instalador para `web/public/downloads/Instalador-Mix-Fiscal.exe`.
 
 Não edite o manifesto ou copie esses arquivos manualmente.

@@ -79,6 +79,7 @@ Revise e envie esses arquivos no mesmo commit. Nunca reutilize um número de ver
 - `Painel_Mix.bat`: controle manual do monitor;
 - `atualizador_mix.ps1`: atualização validada e restauração em caso de falha;
 - `PUBLICAR_ATUALIZACAO.ps1`: gera manifesto, binário público e instalador;
+- `verificar_pacote.py`: descompacta e valida integralmente o pacote antes da publicação;
 - `test_instalador.py`: testes locais sem alterar a API;
 - `GERAR_INSTALADOR.ps1`: recompila o EXE com UAC.
 
