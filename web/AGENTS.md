@@ -7,3 +7,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Deploy deste projeto
+
+- A raiz da aplicação Next.js na Vercel é esta pasta `web`.
+- O projeto vinculado se chama `appmix-retaguarda-importer`.
+- O deploy de produção é disparado pelo push da branch `main`; não execute
+  `vercel --prod` a partir da raiz do repositório.
+- O atualizador do Integrador depende dos arquivos rastreados em
+  `public/integrador-updates/` e `public/downloads/`. Preserve esses diretórios no build.
+- Para publicar uma nova versão do Integrador, siga `../integrador/PUBLICACAO.md` e rode o
+  script a partir da raiz do repositório.

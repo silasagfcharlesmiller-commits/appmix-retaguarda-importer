@@ -64,6 +64,9 @@ powershell -ExecutionPolicy Bypass -File integrador\PUBLICAR_ATUALIZACAO.ps1 `
   -Executavel C:\caminho\desktop-integrador.exe
 ```
 
+O roteiro completo de versão, validação, commit, deploy da Vercel e teste remoto está em
+[`PUBLICACAO.md`](PUBLICACAO.md). Consulte esse arquivo antes de qualquer atualização.
+
 O comando cria `web/public/integrador-updates/version.json`, copia o executável que será
 baixado e publica o instalador completo em `web/public/downloads/Instalador-Mix-Fiscal.exe`.
 Revise e envie esses arquivos no mesmo commit. Nunca reutilize um número de versão.
