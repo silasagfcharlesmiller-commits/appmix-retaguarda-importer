@@ -37,6 +37,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("[System.IO.File]::Replace", updater)
         self.assertIn("schema = 2", publisher)
         self.assertIn("files = $components", publisher)
+        self.assertIn("integrador-updates/${name}?v=$Versao", publisher)
 
     def test_packaged_installer_uses_its_own_directory(self):
         with tempfile.TemporaryDirectory() as temp:

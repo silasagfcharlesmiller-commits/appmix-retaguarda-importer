@@ -39,7 +39,7 @@ foreach ($name in $componentNames) {
     Copy-Item -LiteralPath $source -Destination $destination -Force
     $components += [ordered]@{
         name = $name
-        url = "https://appmix-retaguarda-importer.vercel.app/integrador-updates/$name?v=$Versao"
+        url = "https://appmix-retaguarda-importer.vercel.app/integrador-updates/${name}?v=$Versao"
         sha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToUpperInvariant()
         size = (Get-Item -LiteralPath $source).Length
     }

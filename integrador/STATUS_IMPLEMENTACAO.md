@@ -53,8 +53,8 @@ e o instalador exibem a versão instalada.
   embutidos correspondem aos arquivos de origem;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.332.132 bytes;
-- SHA-256: `E9AF3191F4083DF7AFBAACC12FF4C124393948D86268B1AE7E6966E094601C73`;
+- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.331.834 bytes;
+- SHA-256: `B8BFC43FFA5BE1C49BC4156740904538C5327191F5CF22D8CA727C405D56E2E9`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 
