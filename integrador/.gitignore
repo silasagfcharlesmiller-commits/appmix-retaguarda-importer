@@ -1,0 +1,8 @@
+.runtime/
+.tools/
+__pycache__/
+build/
+dist/
+entrega/
+*.spec
+backup_instalador/
