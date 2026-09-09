@@ -3,7 +3,7 @@
 O arquivo pronto para levar ao cliente fica em `entrega\Instalador-Mix-Fiscal.exe`.
 Ao clicar em **Instalar**, ele solicita permissão de administrador e executa o fluxo completo:
 
-1. copia o Integrador para `C:\mix fiscal\integracao`;
+1. copia o Integrador para a mesma pasta onde o instalador foi colocado;
 2. abre o WebView2 e faz login com os dados informados;
 3. aproveita o Machine ID que o próprio Integrador já criou;
 4. grava esse ID imediatamente para que uma nova tentativa use a mesma identidade;
@@ -26,7 +26,9 @@ existência de um ID diferente para XML ou para outra instalação do CNPJ não 
 
 ## Monitor e manutenção
 
-O instalador copia `Painel_Mix.bat` para `C:\mix fiscal\integracao`. Abra esse painel quando
+Antes de executar, crie a pasta desejada, por exemplo `C:\Mix Fiscal\integrador`, e coloque o
+`Instalador-Mix-Fiscal.exe` dentro dela. O instalador copia `Painel_Mix.bat` e os demais
+componentes para essa mesma pasta. Abra esse painel quando
 precisar fazer manutenção; ele solicita automaticamente a permissão de administrador:
 
 - **2 - Monitorar Integrador**: instala ou reativa o monitor e reativa as tarefas nativas;
@@ -45,11 +47,15 @@ O instalador também copia `atualizador_mix.ps1` e `integrador_version.json` par
 Integrador. A cada execução de cinco minutos, o monitor consulta o manifesto público do App
 Mix. Quando encontra uma versão superior, ele:
 
-1. baixa o novo `desktop-integrador.exe` por HTTPS;
-2. confere o tamanho, o cabeçalho do executável e o SHA-256 publicado;
+1. baixa os componentes alterados por HTTPS;
+2. confere o tamanho e o SHA-256 de cada arquivo, além do cabeçalho dos executáveis;
 3. encerra somente o processo que corresponde ao executável daquela pasta;
-4. cria `desktop-integrador.exe.bak`, substitui o arquivo e grava a versão local;
+4. cria backups, substitui os arquivos e grava a versão local;
 5. abre o Integrador novamente; se a troca falhar, restaura o backup.
+
+Desde a versão `1.0.1`, o ciclo cobre `desktop-integrador.exe`, `Painel_Mix.bat`,
+`monitor_mix.ps1`, `run_silent.vbs` e o próprio `atualizador_mix.ps1`. O Painel Mix e a janela
+do instalador mostram a versão instalada.
 
 O log fica em `atualizador_log.txt`, ao lado do Integrador. A opção **5 - Parar
 Monitoramento** do Painel Mix também interrompe as verificações de atualização durante uma

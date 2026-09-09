@@ -22,7 +22,15 @@ from instalador_core import (
     InstallError, MixApi, normalize_cnpj, read_json, validate_machine_id,
 )
 
-TARGET_DIR = Path(r"C:\mix fiscal\integracao")
+def installer_directory() -> Path:
+    """Usa a pasta do instalador empacotado como destino da instalação."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    development_dir = Path(__file__).resolve().parent
+    return Path(os.environ.get("MIX_INSTALL_DIR", str(development_dir))).resolve()
+
+
+TARGET_DIR = installer_directory()
 TARGET_EXE = TARGET_DIR / "desktop-integrador.exe"
 APP_SETTINGS = Path(os.environ["APPDATA"]) / "mixfiscal-integrador" / "local_settings.json"
 DEBUG_KEY = r"SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
@@ -55,9 +63,10 @@ def require_admin() -> None:
 
 
 def _stop_integrator() -> None:
-    # O filtro usa um caminho constante e só encerra esta instalação.
+    target = str(TARGET_EXE).replace("'", "''")
+    # O filtro usa o destino atual e só encerra esta instalação.
     command = (
-        "$target='C:\\mix fiscal\\integracao\\desktop-integrador.exe';"
+        f"$target='{target}';"
         "Get-CimInstance Win32_Process -Filter \"Name='desktop-integrador.exe'\" | "
         "Where-Object {$_.ExecutablePath -eq $target} | "
         "ForEach-Object {Stop-Process -Id $_.ProcessId -Force}"
@@ -88,10 +97,17 @@ def find_local_machine_id() -> str:
 def prepare_files(progress: Progress) -> None:
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
     _stop_integrator()
-    shutil.copy2(_source_exe(), TARGET_EXE)
-    for name in ("Painel_Mix.bat", "atualizador_mix.ps1", "integrador_version.json"):
+    source_exe = _source_exe()
+    if source_exe.resolve() != TARGET_EXE.resolve():
+        shutil.copy2(source_exe, TARGET_EXE)
+    for name in (
+        "Painel_Mix.bat", "atualizador_mix.ps1", "monitor_mix.ps1",
+        "run_silent.vbs", "integrador_version.json",
+    ):
         destination = TARGET_DIR / name
-        shutil.copy2(_source_asset(name), destination)
+        source = _source_asset(name)
+        if source.resolve() != destination.resolve():
+            shutil.copy2(source, destination)
         if not destination.is_file():
             raise InstallError(f"{name} não foi copiado para a pasta de instalação.")
     progress(f"Aplicativo preparado em {TARGET_DIR}")
@@ -101,33 +117,15 @@ def install_monitor(progress: Progress) -> None:
     """Instala o monitor do Painel Mix sem abrir o menu interativo do BAT."""
     progress("Instalando o monitor automático do Integrador")
     script = TARGET_DIR / "monitor_mix.ps1"
-    script.write_text(
-        "$work = $PSScriptRoot\n"
-        "$updater = Join-Path $work 'atualizador_mix.ps1'\n"
-        "if (Test-Path -LiteralPath $updater) { & $updater }\n"
-        "$target = Join-Path $work 'desktop-integrador.exe'\n"
-        "if (-not (Test-Path -LiteralPath $target)) {\n"
-        "  $candidate = Get-ChildItem -LiteralPath $work -File -Filter '*integrador*.exe' "
-        "| Where-Object { $_.Name -notlike 'Instalador*' } | Select-Object -First 1\n"
-        "  if (-not $candidate) {\n"
-        "    $allExe = @(Get-ChildItem -LiteralPath $work -File -Filter '*.exe' "
-        "| Where-Object { $_.Name -notlike 'Instalador*' })\n"
-        "    if ($allExe.Count -eq 1) { $candidate = $allExe[0] }\n"
-        "  }\n"
-        "  if (-not $candidate) { return }\n"
-        "  $target = $candidate.FullName\n"
-        "}\n"
-        "$processName = [System.IO.Path]::GetFileName($target)\n"
-        "$running = Get-CimInstance Win32_Process -Filter \"Name='$processName'\" "
-        "-ErrorAction SilentlyContinue | Where-Object { $_.ExecutablePath -eq $target }\n"
-        "if (-not $running -and (Test-Path -LiteralPath $target)) {\n"
-        "  $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'\n"
-        "  Add-Content -LiteralPath (Join-Path $work 'monitor_log.txt') "
-        "-Value \"[$stamp] Integrador parado; reiniciando.\" -Encoding UTF8\n"
-        "  Start-Process -FilePath $target -WorkingDirectory $work\n"
-        "}\n",
-        encoding="utf-8-sig",
-    )
+    monitor_source = _source_asset("monitor_mix.ps1")
+    if monitor_source.resolve() != script.resolve():
+        shutil.copy2(monitor_source, script)
+    launcher = TARGET_DIR / "run_silent.vbs"
+    launcher_source = _source_asset("run_silent.vbs")
+    if launcher_source.resolve() != launcher.resolve():
+        shutil.copy2(launcher_source, launcher)
+    if not script.is_file() or not launcher.is_file():
+        raise InstallError("Os arquivos do monitor não foram instalados.")
     task_command = (
         'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass '
         f'-File "{script}"'

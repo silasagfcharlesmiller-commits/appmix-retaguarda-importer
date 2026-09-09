@@ -23,6 +23,8 @@ for ($attempt = 1; $attempt -le 3; $attempt++) {
         --add-binary ((Join-Path $root 'desktop-integrador.exe') + ';.') `
         --add-data ((Join-Path $root 'Painel_Mix.bat') + ';.') `
         --add-data ((Join-Path $root 'atualizador_mix.ps1') + ';.') `
+        --add-data ((Join-Path $root 'monitor_mix.ps1') + ';.') `
+        --add-data ((Join-Path $root 'run_silent.vbs') + ';.') `
         --add-data ((Join-Path $root 'integrador_version.json') + ';.') `
         --paths $root `
         --collect-all playwright `

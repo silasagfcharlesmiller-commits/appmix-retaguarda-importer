@@ -4,8 +4,8 @@ Atualizado em 2026-09-09.
 
 ## Fluxo implementado
 
-O instalador executa como administrador, copia o Integrador e o Painel Mix para
-`C:\mix fiscal\integracao`, autentica no WebView2, reutiliza a identidade nativa existente,
+O instalador executa como administrador, copia o Integrador e o Painel Mix para a própria pasta
+onde o instalador foi colocado, autentica no WebView2, reutiliza a identidade nativa existente,
 configura CNPJ e Mix Fiscal, salva, instala as tarefas nativas, instala o monitor adicional e
 confirma pela API que o ID exato está online para o App Mix.
 
@@ -36,24 +36,25 @@ ele também pode ter qualquer outro nome.
 O Painel Mix usa linhas CRLF reais, sem BOM, e solicita elevação administrativa ao ser aberto.
 Há um teste que impede publicar novamente o BAT com sequências `\n` literais.
 
-O monitor agora executa o atualizador antes de verificar o processo. A versão `1.0.0`
-consulta o manifesto público do site, aceita somente download HTTPS do domínio configurado,
-valida tamanho, SHA-256 e cabeçalho PE, mantém um backup e restaura o executável caso a
-substituição falhe. O manifesto e os downloads ficam em `web/public` e seguem no mesmo deploy
-do painel.
+O monitor agora executa o atualizador antes de verificar o processo. A versão `1.0.1`
+consulta o manifesto público do site, aceita somente downloads HTTPS do domínio configurado e
+atualiza cinco componentes: Integrador, Painel Mix, monitor, lançador silencioso e o próprio
+atualizador. Cada arquivo tem tamanho e SHA-256 validados; executáveis também têm o cabeçalho
+verificado. A troca mantém backups e restaura os componentes caso uma etapa falhe. O Painel Mix
+e o instalador exibem a versão instalada.
 
 ## Validações
 
-- 13 testes locais passaram;
+- 15 testes locais passaram, incluindo o alcance dos cinco componentes e o destino dinâmico;
 - os três arquivos Python compilam com `py_compile`;
 - o pacote contém `desktop-integrador.exe`, `Painel_Mix.bat`, `atualizador_mix.ps1`,
-  `integrador_version.json` e o driver Playwright;
-- as 358 entradas do CArchive foram descompactadas; o Integrador e o Node do Playwright
+  `monitor_mix.ps1`, `run_silent.vbs`, `integrador_version.json` e o driver Playwright;
+- as 360 entradas do CArchive foram descompactadas; o Integrador e o Node do Playwright
   embutidos correspondem aos arquivos de origem;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.327.802 bytes;
-- SHA-256: `5EEEBFC5790C175106C9E6D63262B3189660A441BAFAA3EB777BCB3F9480ABE9`;
+- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.332.132 bytes;
+- SHA-256: `E9AF3191F4083DF7AFBAACC12FF4C124393948D86268B1AE7E6966E094601C73`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 

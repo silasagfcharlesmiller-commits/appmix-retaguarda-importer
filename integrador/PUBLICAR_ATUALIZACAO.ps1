@@ -22,21 +22,44 @@ if ($sourceExe -ne $integratorExe) {
 }
 Copy-Item -LiteralPath $sourceExe -Destination (Join-Path $publicUpdate 'desktop-integrador.exe') -Force
 
-$hash = (Get-FileHash -LiteralPath $integratorExe -Algorithm SHA256).Hash.ToUpperInvariant()
-$size = (Get-Item -LiteralPath $integratorExe).Length
+$componentNames = @(
+    'desktop-integrador.exe',
+    'Painel_Mix.bat',
+    'monitor_mix.ps1',
+    'run_silent.vbs',
+    'atualizador_mix.ps1'
+)
+$components = @()
+foreach ($name in $componentNames) {
+    $source = Join-Path $root $name
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "Componente obrigatorio nao encontrado: $name"
+    }
+    $destination = Join-Path $publicUpdate $name
+    Copy-Item -LiteralPath $source -Destination $destination -Force
+    $components += [ordered]@{
+        name = $name
+        url = "https://appmix-retaguarda-importer.vercel.app/integrador-updates/$name?v=$Versao"
+        sha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToUpperInvariant()
+        size = (Get-Item -LiteralPath $source).Length
+    }
+}
+
+$executable = $components | Where-Object { $_.name -eq 'desktop-integrador.exe' }
 $manifest = [ordered]@{
-    schema = 1
+    schema = 2
     version = $Versao
     channel = 'stable'
     published_at = [DateTimeOffset]::UtcNow.ToString('o')
     executable = [ordered]@{
-        url = "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=$Versao"
-        sha256 = $hash
-        size = $size
+        url = $executable.url
+        sha256 = $executable.sha256
+        size = $executable.size
     }
+    files = $components
 }
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-$manifestJson = $manifest | ConvertTo-Json -Depth 4
+$manifestJson = $manifest | ConvertTo-Json -Depth 6
 [System.IO.File]::WriteAllText(
     (Join-Path $publicUpdate 'version.json'), $manifestJson, $utf8NoBom
 )
@@ -50,5 +73,6 @@ Copy-Item -LiteralPath (Join-Path $root 'entrega\Instalador-Mix-Fiscal.exe') `
     -Destination (Join-Path $publicDownload 'Instalador-Mix-Fiscal.exe') -Force
 
 Write-Host "Versao $Versao preparada."
-Write-Host "SHA-256 do Integrador: $hash"
+Write-Host "SHA-256 do Integrador: $($executable.sha256)"
+Write-Host "Componentes publicados: $($components.Count)"
 Write-Host 'Revise os arquivos, confirme o build do site e publique o commit.'

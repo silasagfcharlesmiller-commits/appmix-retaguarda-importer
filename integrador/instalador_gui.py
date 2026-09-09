@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import sys
+from pathlib import Path
 
 from PyQt6.QtCore import QRectF, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
@@ -11,8 +13,20 @@ from PyQt6.QtWidgets import (
     QProgressBar, QPushButton, QScrollArea, QSizePolicy, QToolButton, QVBoxLayout, QWidget,
 )
 
-from automacao_primeiro_acesso import install
+from automacao_primeiro_acesso import TARGET_DIR, install
 from instalador_core import InstallError
+
+
+def bundled_version() -> str:
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    try:
+        data = json.loads((base / "integrador_version.json").read_text(encoding="utf-8-sig"))
+        return str(data["version"])
+    except (OSError, KeyError, TypeError, ValueError):
+        return "nao informada"
+
+
+APP_VERSION = bundled_version()
 
 
 APP_STYLE = """
@@ -138,7 +152,7 @@ class InstallerWindow(QWidget):
         self.worker = None
         self.password_visible = False
         self.setObjectName("root")
-        self.setWindowTitle("Mix Fiscal | Instalador do Integrador")
+        self.setWindowTitle(f"Mix Fiscal | Instalador do Integrador v{APP_VERSION}")
         self.setStyleSheet(APP_STYLE)
 
         outer = QVBoxLayout(self)
@@ -161,7 +175,8 @@ class InstallerWindow(QWidget):
         title = QLabel("Instalar Integrador")
         title.setObjectName("title")
         subtitle = QLabel(
-            "Configure esta máquina, ative o monitoramento e confirme a conexão com o App Mix."
+            "Configure esta máquina, ative o monitoramento e confirme a conexão com o App Mix.\n"
+            f"Destino: {TARGET_DIR}"
         )
         subtitle.setObjectName("subtitle")
         subtitle.setWordWrap(True)
@@ -170,7 +185,7 @@ class InstallerWindow(QWidget):
         root.addWidget(subtitle)
         root.addWidget(self._form_card())
 
-        footer = QLabel("MIX FISCAL  •  INSTALAÇÃO SEGURA DO INTEGRADOR")
+        footer = QLabel(f"MIX FISCAL  •  INSTALAÇÃO SEGURA DO INTEGRADOR  •  v{APP_VERSION}")
         footer.setObjectName("footer")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(footer)

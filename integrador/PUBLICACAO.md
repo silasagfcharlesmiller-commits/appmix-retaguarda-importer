@@ -111,7 +111,13 @@ se o instalador responde com HTTP `200` e o tamanho esperado.
 
 ## Alcance da atualização automática
 
-O monitor instalado verifica o manifesto a cada cinco minutos. Ele atualiza automaticamente
-somente `desktop-integrador.exe`, cria um backup e reinicia o processo. Se a mudança estiver em
-`atualizador_mix.ps1`, `Painel_Mix.bat`, na automação do instalador ou no próprio instalador, as
-máquinas existentes precisam executar o novo `Instalador-Mix-Fiscal.exe` uma vez.
+O monitor instalado verifica o manifesto a cada cinco minutos. A partir da versão `1.0.1`, ele
+atualiza automaticamente `desktop-integrador.exe`, `Painel_Mix.bat`, `monitor_mix.ps1`,
+`run_silent.vbs` e o próprio `atualizador_mix.ps1`. Cada componente é validado por origem HTTPS,
+tamanho e SHA-256. A troca usa backup e restaura os arquivos se uma etapa falhar.
+
+Máquinas que receberam uma versão anterior a `1.0.1` precisam executar o instalador novo uma
+vez para receber o atualizador completo. Depois dessa transição, novas versões desses cinco
+componentes chegam automaticamente. Mudanças na automação de instalação ou no próprio
+`Instalador-Mix-Fiscal.exe` continuam exigindo o novo instalador, pois ele não permanece na pasta
+instalada.

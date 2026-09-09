@@ -34,6 +34,8 @@ def main() -> int:
         if name in {
             "Painel_Mix.bat",
             "atualizador_mix.ps1",
+            "monitor_mix.ps1",
+            "run_silent.vbs",
             "desktop-integrador.exe",
             "integrador_version.json",
             r"playwright\driver\node.exe",
@@ -43,6 +45,8 @@ def main() -> int:
     required = {
         "Painel_Mix.bat",
         "atualizador_mix.ps1",
+        "monitor_mix.ps1",
+        "run_silent.vbs",
         "desktop-integrador.exe",
         "integrador_version.json",
         r"playwright\driver\node.exe",
@@ -55,7 +59,10 @@ def main() -> int:
     if sha256(extracted["desktop-integrador.exe"]) != sha256(source_integrator):
         raise RuntimeError("O Integrador embutido difere do arquivo de origem.")
 
-    for asset_name in ("Painel_Mix.bat", "atualizador_mix.ps1", "integrador_version.json"):
+    for asset_name in (
+        "Painel_Mix.bat", "atualizador_mix.ps1", "monitor_mix.ps1",
+        "run_silent.vbs", "integrador_version.json",
+    ):
         source_asset = (root / asset_name).read_bytes()
         if sha256(extracted[asset_name]) != sha256(source_asset):
             raise RuntimeError(f"O arquivo {asset_name} embutido difere da origem.")

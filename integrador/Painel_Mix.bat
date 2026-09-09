@@ -38,6 +38,8 @@ if not defined NOME_EXE (
 if not defined NOME_EXE set "NOME_EXE=desktop-integrador.exe"
 set "NOME_PROCESSO=%NOME_EXE:.exe=%"
 set "NOME_TAREFA=Mix Fiscal - Monitorar Integrador"
+set "VERSAO_INSTALADA=nao informada"
+if exist "%PASTA_MIX%\integrador_version.json" for /f "usebackq delims=" %%V in (`powershell.exe -NoProfile -Command "$j=Get-Content -LiteralPath '%PASTA_MIX%\integrador_version.json' -Raw; $o=ConvertFrom-Json -InputObject $j; Write-Output $o.version"`) do set "VERSAO_INSTALADA=%%V"
 
 if /I "%~1"=="--install-monitor" goto INSTALAR
 if /I "%~1"=="--stop-monitor" goto DESINSTALAR
@@ -45,13 +47,14 @@ if /I "%~1"=="--stop-monitor" goto DESINSTALAR
 :MENU
 cls
 echo ==============================================================================
-echo                PAINEL DE CONTROLE - MONITOR MIX FISCAL     1
+echo             PAINEL DE CONTROLE - MONITOR MIX FISCAL v%VERSAO_INSTALADA%
 echo ==============================================================================
 echo Configuracao Detectada Automaticamente:
 echo   [1] Caminho da Pasta : %PASTA_MIX%
 echo   [2] Nome do Executavel: %NOME_EXE%
 echo   [3] Nome do Processo  : %NOME_PROCESSO%
 echo   [4] Nome da Tarefa    : %NOME_TAREFA%
+echo   [5] Versao instalada  : %VERSAO_INSTALADA%
 echo ==============================================================================
 echo ESCOLHA UMA OPCAO:
 echo.
@@ -204,6 +207,7 @@ echo ===========================================================================
 echo                      STATUS DO PROCESSO E MONITOR
 echo ==============================================================================
 echo.
+echo [VERSAO] %VERSAO_INSTALADA%
 tasklist /fi "IMAGENAME eq %NOME_EXE%" 2>NUL | findstr /I "%NOME_EXE%" >nul
 if %errorlevel% equ 0 (
     echo [RODANDO] O %NOME_EXE% esta em execucao.

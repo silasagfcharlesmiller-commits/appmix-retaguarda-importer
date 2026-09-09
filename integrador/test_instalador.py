@@ -1,11 +1,12 @@
 import hashlib
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from automacao_primeiro_acesso import find_local_machine_id, install_monitor
+from automacao_primeiro_acesso import find_local_machine_id, install_monitor, installer_directory
 from instalador_core import (InstallError, MixApi, atomic_json, generate_machine_id,
                             normalize_cnpj, read_json, registration_payload, validate_machine_id)
 
@@ -20,6 +21,29 @@ class InstallerTests(unittest.TestCase):
         self.assertIn(b"atualizador_mix.ps1", panel)
         self.assertIn(b"--install-monitor", panel)
         self.assertIn(b"RESULTADO_TAREFA", panel)
+        self.assertIn(b"VERSAO_INSTALADA", panel)
+
+    def test_updater_covers_all_installed_components(self):
+        root = Path(__file__).parent
+        updater = (root / "atualizador_mix.ps1").read_text(encoding="utf-8-sig")
+        publisher = (root / "PUBLICAR_ATUALIZACAO.ps1").read_text(encoding="utf-8-sig")
+        for name in (
+            "desktop-integrador.exe", "Painel_Mix.bat", "monitor_mix.ps1",
+            "run_silent.vbs", "atualizador_mix.ps1",
+        ):
+            self.assertIn(name, updater)
+            self.assertIn(name, publisher)
+        self.assertIn("$allowedFiles", updater)
+        self.assertIn("[System.IO.File]::Replace", updater)
+        self.assertIn("schema = 2", publisher)
+        self.assertIn("files = $components", publisher)
+
+    def test_packaged_installer_uses_its_own_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            installer = Path(temp) / "pasta cliente" / "Instalador-Mix-Fiscal.exe"
+            with patch.object(sys, "frozen", True, create=True), \
+                 patch.object(sys, "executable", str(installer)):
+                self.assertEqual(installer_directory(), installer.parent.resolve())
 
     def test_cnpj_check_digits(self):
         self.assertEqual(normalize_cnpj("52.703.958/0001-42"), "52703958000142")
