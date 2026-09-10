@@ -20,6 +20,18 @@ function Write-UpdateLog([string]$message) {
     Add-Content -LiteralPath $logFile -Value "[$stamp] $message" -Encoding UTF8
 }
 
+function Set-IntegratorRunAsAdmin([string]$path) {
+    if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { return }
+    $layers = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers'
+    New-Item -Path $layers -Force | Out-Null
+    $current = (Get-ItemProperty -Path $layers -Name $path -ErrorAction SilentlyContinue).$path
+    if ([string]$current -notmatch '(?i)(^|\s)RUNASADMIN($|\s)') {
+        $value = (([string]$current).Trim() + ' RUNASADMIN').Trim()
+        if (-not $value.StartsWith('~')) { $value = '~ ' + $value }
+        New-ItemProperty -Path $layers -Name $path -Value $value -PropertyType String -Force | Out-Null
+    }
+}
+
 function Find-IntegratorExe {
     $preferred = Join-Path $work 'desktop-integrador.exe'
     if (Test-Path -LiteralPath $preferred) { return $preferred }
@@ -118,7 +130,9 @@ try {
         $manifest = $manifestResponse
     }
     $remoteVersion = [version]([string]$manifest.version)
-    if ($remoteVersion -le $localVersion) { return }
+    $currentIntegrator = Find-IntegratorExe
+    Set-IntegratorRunAsAdmin $currentIntegrator
+    if ($remoteVersion -lt $localVersion) { return }
 
     New-Item -ItemType Directory -Path $updateDir -Force | Out-Null
     $downloads = @()
@@ -126,6 +140,7 @@ try {
         $downloaded = Download-UpdateFile $entry
         if ($downloaded) { $downloads += $downloaded }
     }
+    if ($downloads.Count -eq 0) { return }
 
     $exeUpdate = $downloads | Where-Object { $_.Name -eq 'desktop-integrador.exe' }
     if ($exeUpdate) {
@@ -177,9 +192,11 @@ try {
         Copy-Item -LiteralPath $versionTemp -Destination $versionFile -Force
         Remove-Item -LiteralPath $versionTemp -Force
         if ($exeUpdate -and (Test-Path -LiteralPath $exeUpdate.Destination)) {
+            Set-IntegratorRunAsAdmin $exeUpdate.Destination
             Start-Process -FilePath $exeUpdate.Destination -WorkingDirectory $work
         }
-        Write-UpdateLog "Atualizado de $localVersion para $remoteVersion; $($downloads.Count) componente(s) alterado(s)."
+        $operation = if ($remoteVersion -gt $localVersion) { 'Atualizado' } else { 'Reparado' }
+        Write-UpdateLog "$operation de $localVersion para $remoteVersion; $($downloads.Count) componente(s) alterado(s)."
     } catch {
         $applyError = $_.Exception.Message
         $failedName = if ($item) { $item.Name } else { 'versao local' }

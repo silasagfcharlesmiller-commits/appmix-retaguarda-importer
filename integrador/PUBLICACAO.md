@@ -44,7 +44,7 @@ Não edite o manifesto ou copie esses arquivos manualmente.
 ## 3. Validar antes do commit
 
 ```powershell
-python -m py_compile integrador\instalador_core.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
+python -m py_compile integrador\instalador_core.py integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
 Push-Location integrador
 python -m unittest test_instalador.py
 Pop-Location
@@ -121,3 +121,8 @@ vez para receber o atualizador completo. Depois dessa transição, novas versõe
 componentes chegam automaticamente. Mudanças na automação de instalação ou no próprio
 `Instalador-Mix-Fiscal.exe` continuam exigindo o novo instalador, pois ele não permanece na pasta
 instalada.
+
+A partir da versão `1.1.0`, o manifesto também contém tamanho e SHA-256 do próprio instalador.
+Ao abrir, o setup consulta esse manifesto e, quando há uma versão superior, baixa, valida e abre
+o novo setup preservando a pasta original como destino. Uma versão anterior a `1.1.0` precisa
+ser substituída manualmente uma última vez para receber esse mecanismo.

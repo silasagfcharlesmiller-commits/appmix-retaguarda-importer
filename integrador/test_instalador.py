@@ -6,7 +6,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from automacao_primeiro_acesso import find_local_machine_id, install_monitor, installer_directory
+from automacao_primeiro_acesso import (
+    _copy_verified, find_local_machine_id, install_monitor, installer_directory,
+)
+from diagnostico_instalador import InstallationDiagnostics, probe_directory, sha256_file
 from instalador_core import (InstallError, MixApi, atomic_json, generate_machine_id,
                             normalize_cnpj, read_json, registration_payload, validate_machine_id)
 
@@ -42,6 +45,10 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("schema = 2", publisher)
         self.assertIn("files = $components", publisher)
         self.assertIn("integrador-updates/${name}?v=$Versao", publisher)
+        self.assertIn("$manifest['installer']", publisher)
+        self.assertIn("Instalador-Mix-Fiscal.exe?v=$Versao", publisher)
+        self.assertIn("$remoteVersion -lt $localVersion", updater)
+        self.assertIn("Set-IntegratorRunAsAdmin", updater)
 
     def test_packaged_installer_uses_its_own_directory(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -49,6 +56,45 @@ class InstallerTests(unittest.TestCase):
             with patch.object(sys, "frozen", True, create=True), \
                  patch.object(sys, "executable", str(installer)):
                 self.assertEqual(installer_directory(), installer.parent.resolve())
+
+    def test_updated_installer_can_preserve_original_target_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            destination = Path(temp) / "Mix Fiscal" / "integrador"
+            with patch.object(sys, "argv", ["setup.exe", "--install-dir", str(destination)]):
+                self.assertEqual(installer_directory(), destination.resolve())
+
+    def test_component_copy_is_atomic_and_hash_verified(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source.bin"
+            destination = root / "destination.bin"
+            source.write_bytes(b"componente mix fiscal")
+            expected = sha256_file(source)
+            self.assertEqual(_copy_verified(source, destination), expected)
+            self.assertEqual(sha256_file(destination), expected)
+            self.assertEqual(list(root.glob("*.installing")), [])
+
+    def test_install_directory_permission_probe_cleans_temporary_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "integrador"
+            probe_directory(target)
+            self.assertEqual(list(target.glob(".mix-write-*.tmp")), [])
+            self.assertEqual(list(target.glob(".mix-write-*.renamed")), [])
+
+    def test_diagnostic_writes_text_and_json_without_credentials(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "integrador"
+            with patch.dict("os.environ", {"PROGRAMDATA": ""}):
+                diagnostics = InstallationDiagnostics(target)
+            diagnostics.event("teste", "ok", "Permissão confirmada")
+            report = diagnostics.finish("verificado", result="ok")
+            data = read_json(report)
+            self.assertEqual(data["status"], "verificado")
+            self.assertEqual(data["summary"]["result"], "ok")
+            self.assertTrue((report.parent / "instalacao.log").is_file())
+            content = report.read_text(encoding="utf-8")
+            self.assertNotIn("password", content.casefold())
+            self.assertNotIn("senha", content.casefold())
 
     def test_cnpj_check_digits(self):
         self.assertEqual(normalize_cnpj("52.703.958/0001-42"), "52703958000142")

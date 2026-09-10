@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QRectF, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QRectF, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
@@ -14,6 +14,9 @@ from PyQt6.QtWidgets import (
 )
 
 from automacao_primeiro_acesso import TARGET_DIR, install
+from diagnostico_instalador import (
+    InstallationDiagnostics, environment_report, maybe_start_installer_update,
+)
 from instalador_core import InstallError
 
 
@@ -108,6 +111,25 @@ QPushButton#installButton {
 QPushButton#installButton:hover { background: #185741; }
 QPushButton#installButton:pressed { background: #124536; }
 QPushButton#installButton:disabled { color: #dbe6e1; background: #78978b; }
+QPushButton#checkButton {
+    min-height: 40px;
+    padding: 0 18px;
+    color: #1f6b52;
+    background: #eef7f2;
+    border: 1px solid #b9d6c8;
+    border-radius: 10px;
+    font-weight: 700;
+}
+QPushButton#checkButton:hover { background: #e0f0e8; }
+QLabel#versions {
+    padding: 10px 12px;
+    color: #43534d;
+    background: #f8faf9;
+    border: 1px solid #e0e8e4;
+    border-radius: 9px;
+    font-family: Consolas;
+    font-size: 11px;
+}
 QLabel#footer { color: #89958f; font-size: 11px; }
 """
 
@@ -146,10 +168,27 @@ class InstallWorker(QThread):
             self.failed.emit(message)
 
 
+class DiagnosticWorker(QThread):
+    succeeded = pyqtSignal(dict)
+    failed = pyqtSignal(str)
+
+    def run(self):
+        diagnostics = InstallationDiagnostics(TARGET_DIR)
+        try:
+            report = environment_report(TARGET_DIR, APP_VERSION)
+            diagnostics.event("ambiente", "ok", "Verificação do ambiente concluída")
+            report["diagnostic"] = str(diagnostics.finish("verificado", **report))
+            self.succeeded.emit(report)
+        except Exception as exc:
+            report_path = diagnostics.finish("falhou", error=exc)
+            self.failed.emit(f"{exc}\n\nDiagnóstico salvo em:\n{report_path}")
+
+
 class InstallerWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.worker = None
+        self.diagnostic_worker = None
         self.password_visible = False
         self.setObjectName("root")
         self.setWindowTitle(f"Mix Fiscal | Instalador do Integrador v{APP_VERSION}")
@@ -201,6 +240,7 @@ class InstallerWindow(QWidget):
                 available.x() + (available.width() - width) // 2,
                 available.y() + (available.height() - height) // 2,
             )
+        QTimer.singleShot(350, self.check_environment)
 
     def _brand(self) -> QFrame:
         frame = QFrame()
@@ -286,12 +326,26 @@ class InstallerWindow(QWidget):
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
 
+        self.versions = QLabel(
+            f"Instalador: {APP_VERSION}  |  Integrador: verificando...\n"
+            "WebView2: verificando...  |  Monitor: verificando..."
+        )
+        self.versions.setObjectName("versions")
+        self.versions.setWordWrap(True)
+        layout.addWidget(self.versions)
+
         self.bar = QProgressBar()
         self.bar.setTextVisible(False)
         self.bar.setRange(0, 1)
         self.bar.setValue(0)
         layout.addWidget(self.bar)
         layout.addStretch()
+
+        self.check_button = QPushButton("Verificar ambiente e gerar diagnóstico")
+        self.check_button.setObjectName("checkButton")
+        self.check_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.check_button.clicked.connect(self.check_environment)
+        layout.addWidget(self.check_button)
 
         self.button = QPushButton("Instalar Integrador e Monitor")
         self.button.setObjectName("installButton")
@@ -315,6 +369,37 @@ class InstallerWindow(QWidget):
         self.password.setEnabled(enabled)
         self.eye.setEnabled(enabled)
         self.button.setEnabled(enabled)
+        self.check_button.setEnabled(enabled)
+
+    def check_environment(self):
+        if self.diagnostic_worker and self.diagnostic_worker.isRunning():
+            return
+        self.check_button.setEnabled(False)
+        self.check_button.setText("Verificando...")
+        self.diagnostic_worker = DiagnosticWorker()
+        self.diagnostic_worker.succeeded.connect(self.environment_ready)
+        self.diagnostic_worker.failed.connect(self.environment_failed)
+        self.diagnostic_worker.start()
+
+    def environment_ready(self, report: dict):
+        available = report.get("available_version", "indisponível")
+        update = " • atualização disponível" if report.get("update_available") else ""
+        self.versions.setText(
+            f"Instalador: {report['installer_version']}  |  Publicada: {available}{update}\n"
+            f"Integrador: {report['integrator_release']} ({report['integrator_file_version']})  |  "
+            f"Painel BAT: {report['panel_version']}\n"
+            f"WebView2: {report['webview2_version']}  |  "
+            f"Monitor: {report['monitor']}  |  Administrador: {report['run_as_admin']}  |  "
+            f"Proteção: {report['security_findings']} ocorrência(s)"
+        )
+        self.check_button.setText("Verificar novamente")
+        self.check_button.setEnabled(True)
+
+    def environment_failed(self, message: str):
+        self.versions.setText("Não foi possível concluir a verificação. Consulte o diagnóstico.")
+        self.check_button.setText("Tentar novamente")
+        self.check_button.setEnabled(True)
+        QMessageBox.warning(self, "Verificação do ambiente", message)
 
     def start(self):
         if self.worker and self.worker.isRunning():
@@ -355,6 +440,14 @@ class InstallerWindow(QWidget):
 
 
 if __name__ == "__main__":
+    try:
+        if maybe_start_installer_update(APP_VERSION, TARGET_DIR):
+            raise SystemExit(0)
+    except InstallError:
+        # A falha não impede uma instalação local e fica registrada para suporte.
+        diagnostics = InstallationDiagnostics(TARGET_DIR)
+        diagnostics.event("autoatualização", "erro", "Não foi possível abrir o setup mais recente")
+        diagnostics.finish("atenção", result="setup local mantido")
     app = QApplication(sys.argv)
     app.setApplicationName("Instalador Mix Fiscal")
     window = InstallerWindow()

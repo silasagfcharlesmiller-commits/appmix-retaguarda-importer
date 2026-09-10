@@ -1,6 +1,6 @@
 # Status da automação do Integrador
 
-Atualizado em 2026-09-09.
+Atualizado em 2026-09-10.
 
 ## Fluxo implementado
 
@@ -47,18 +47,31 @@ O instalador chama `Painel_Mix.bat --install-monitor`. O BAT fornecido pelo oper
 como base e cadastra a tarefa por `wscript.exe`, mantendo o monitor invisível. O mesmo painel
 instala, consulta e desinstala o monitor sem deixar tarefas antigas duplicadas.
 
+## Branch v1.1 — diagnóstico e recuperação
+
+A branch `integrador-v1.1-diagnostico` acrescenta verificação automática do WebView2, cópia
+atômica com SHA-256, reparo de componentes mesmo sem mudança de versão, execução permanente do
+Integrador como administrador e relatórios em `logs\instalacao.log` e `logs\diagnostico.json`.
+A tela mostra as versões do setup, Integrador, Painel BAT e WebView2 e permite repetir a
+verificação do ambiente. O banco permanece fora do setup e continua sendo enviado pelo site.
+
+O manifesto gerado para versões a partir da `1.1.0` inclui o próprio instalador. Setups dessa
+geração conseguem baixar, validar e abrir uma versão superior mantendo a pasta de destino
+original. O diagnóstico registra ocorrências relacionadas encontradas no Microsoft Defender
+e gera informações para a TI sem alterar ou desativar a proteção da máquina.
+
 ## Validações
 
-- 15 testes locais passaram, incluindo o alcance dos cinco componentes e o destino dinâmico;
-- os três arquivos Python compilam com `py_compile`;
+- 19 testes locais passaram, incluindo diagnóstico, integridade dos componentes e destino dinâmico;
+- os quatro arquivos Python compilam com `py_compile`;
 - o pacote contém `desktop-integrador.exe`, `Painel_Mix.bat`, `atualizador_mix.ps1`,
   `monitor_mix.ps1`, `run_silent.vbs`, `integrador_version.json` e o driver Playwright;
 - as 360 entradas do CArchive foram descompactadas; o Integrador e o Node do Playwright
   embutidos correspondem aos arquivos de origem;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.330.334 bytes;
-- SHA-256: `0CF2F7C0C90BDA0CB6C74125622DDBCC1967D131B1CEB75AB0598FBC6CB6E684`;
+- artefato candidato v1.1.0: `entrega\Instalador-Mix-Fiscal.exe`, 91.352.371 bytes;
+- SHA-256: `97E3780E1D315ADDC7B02B1AA5DDB907BF07192B637C6A6003258BEC4DE4BD9A`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 

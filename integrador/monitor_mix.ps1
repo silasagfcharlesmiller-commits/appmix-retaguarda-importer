@@ -23,5 +23,15 @@ if (-not $running -and (Test-Path -LiteralPath $target)) {
     $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     Add-Content -LiteralPath (Join-Path $work 'monitor_log.txt') `
         -Value "[$stamp] Integrador parado; reiniciando." -Encoding UTF8
-    Start-Process -FilePath $target -WorkingDirectory $work
+    try {
+        $started = Start-Process -FilePath $target -WorkingDirectory $work -PassThru -ErrorAction Stop
+        Start-Sleep -Seconds 2
+        if ($started.HasExited) {
+            Add-Content -LiteralPath (Join-Path $work 'monitor_log.txt') `
+                -Value "[$stamp] ERRO: Integrador encerrou imediatamente. Codigo: $($started.ExitCode)." -Encoding UTF8
+        }
+    } catch {
+        Add-Content -LiteralPath (Join-Path $work 'monitor_log.txt') `
+            -Value "[$stamp] ERRO ao iniciar Integrador: $($_.Exception.Message)" -Encoding UTF8
+    }
 }

@@ -69,10 +69,24 @@ $localVersionJson = @{version = $Versao; channel = 'stable'} | ConvertTo-Json
 )
 
 & (Join-Path $root 'GERAR_INSTALADOR.ps1') -SkipDependencies
-Copy-Item -LiteralPath (Join-Path $root 'entrega\Instalador-Mix-Fiscal.exe') `
-    -Destination (Join-Path $publicDownload 'Instalador-Mix-Fiscal.exe') -Force
+$installerSource = Join-Path $root 'entrega\Instalador-Mix-Fiscal.exe'
+$installerPublic = Join-Path $publicDownload 'Instalador-Mix-Fiscal.exe'
+Copy-Item -LiteralPath $installerSource -Destination $installerPublic -Force
+
+# O manifesto do setup é incluído após o build para permitir atualização automática
+# do próprio instalador sem criar dependência circular no arquivo empacotado.
+$manifest['installer'] = [ordered]@{
+    url = "https://appmix-retaguarda-importer.vercel.app/downloads/Instalador-Mix-Fiscal.exe?v=$Versao"
+    sha256 = (Get-FileHash -LiteralPath $installerSource -Algorithm SHA256).Hash.ToUpperInvariant()
+    size = (Get-Item -LiteralPath $installerSource).Length
+}
+$manifestJson = $manifest | ConvertTo-Json -Depth 6
+[System.IO.File]::WriteAllText(
+    (Join-Path $publicUpdate 'version.json'), $manifestJson, $utf8NoBom
+)
 
 Write-Host "Versao $Versao preparada."
 Write-Host "SHA-256 do Integrador: $($executable.sha256)"
 Write-Host "Componentes publicados: $($components.Count)"
+Write-Host "SHA-256 do Instalador: $($manifest['installer'].sha256)"
 Write-Host 'Revise os arquivos, confirme o build do site e publique o commit.'

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import ctypes
+import json
 import os
 from pathlib import Path
 import shutil
@@ -18,12 +19,22 @@ from typing import Callable
 import urllib.request
 import winreg
 
+from diagnostico_instalador import (
+    InstallationDiagnostics, configure_run_as_admin, ensure_webview2,
+    is_run_as_admin_configured, probe_directory, security_protection_findings, sha256_file,
+)
 from instalador_core import (
     InstallError, MixApi, normalize_cnpj, read_json, validate_machine_id,
 )
 
 def installer_directory() -> Path:
     """Usa a pasta do instalador empacotado como destino da instalação."""
+    if "--install-dir" in sys.argv:
+        try:
+            value = sys.argv[sys.argv.index("--install-dir") + 1]
+        except IndexError as exc:
+            raise InstallError("O parâmetro --install-dir está sem o caminho de destino.") from exc
+        return Path(value).expanduser().resolve()
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     development_dir = Path(__file__).resolve().parent
@@ -94,22 +105,63 @@ def find_local_machine_id() -> str:
     return config_id or app_id
 
 
-def prepare_files(progress: Progress) -> None:
+def _copy_verified(source: Path, destination: Path) -> str:
+    """Copia de forma atômica e confirma a integridade; repete uma vez se houver bloqueio."""
+    source_hash = sha256_file(source)
+    if source.resolve() == destination.resolve():
+        if not destination.is_file() or sha256_file(destination) != source_hash:
+            raise InstallError(f"O componente local {destination.name} está corrompido.")
+        return source_hash
+    last_error: Exception | None = None
+    for attempt in range(2):
+        temporary = destination.with_name(f".{destination.name}.installing")
+        try:
+            temporary.unlink(missing_ok=True)
+            shutil.copy2(source, temporary)
+            if sha256_file(temporary) != source_hash:
+                raise OSError("o SHA-256 da cópia temporária não confere")
+            os.replace(temporary, destination)
+            if not destination.is_file() or sha256_file(destination) != source_hash:
+                raise OSError("o arquivo desapareceu ou foi alterado após a cópia")
+            return source_hash
+        except OSError as exc:
+            last_error = exc
+            temporary.unlink(missing_ok=True)
+            if attempt == 0:
+                time.sleep(0.8)
+    raise InstallError(
+        f"Não foi possível instalar {destination.name}. O arquivo pode ter sido bloqueado "
+        "ou removido pela proteção da máquina. Consulte o diagnóstico para a TI."
+    ) from last_error
+
+
+def prepare_files(progress: Progress, diagnostics: InstallationDiagnostics | None = None) -> None:
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
+    probe_directory(TARGET_DIR)
+    if diagnostics:
+        diagnostics.event("permissões", "ok", "Leitura, gravação e renomeação confirmadas")
     _stop_integrator()
     source_exe = _source_exe()
-    if source_exe.resolve() != TARGET_EXE.resolve():
-        shutil.copy2(source_exe, TARGET_EXE)
+    installed = {TARGET_EXE.name: _copy_verified(source_exe, TARGET_EXE)}
     for name in (
         "Painel_Mix.bat", "atualizador_mix.ps1", "monitor_mix.ps1",
         "run_silent.vbs", "integrador_version.json",
     ):
         destination = TARGET_DIR / name
         source = _source_asset(name)
-        if source.resolve() != destination.resolve():
-            shutil.copy2(source, destination)
-        if not destination.is_file():
-            raise InstallError(f"{name} não foi copiado para a pasta de instalação.")
+        installed[name] = _copy_verified(source, destination)
+    configure_run_as_admin(TARGET_EXE)
+    if not is_run_as_admin_configured(TARGET_EXE):
+        raise InstallError("A execução permanente como administrador não foi confirmada.")
+    if diagnostics:
+        diagnostics.event(
+            "componentes", "ok", "Arquivos instalados e validados por SHA-256",
+            count=len(installed),
+        )
+        diagnostics.event(
+            "administrador", "ok", "Integrador marcado para executar como administrador",
+            executable=TARGET_EXE,
+        )
     progress(f"Aplicativo preparado em {TARGET_DIR}")
 
 
@@ -191,6 +243,28 @@ def _wait_debug_port(timeout: float = 30) -> None:
         except OSError:
             time.sleep(0.25)
     raise InstallError("O WebView2 não abriu a porta temporária de automação.")
+
+
+def _start_integrator_verified(progress: Progress, diagnostics: InstallationDiagnostics) -> None:
+    if not TARGET_EXE.is_file():
+        raise InstallError("O Integrador desapareceu antes da inicialização final.")
+    progress("Abrindo e validando o processo do Integrador")
+    try:
+        process = subprocess.Popen(
+            [str(TARGET_EXE)], cwd=str(TARGET_DIR),
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        time.sleep(2)
+    except OSError as exc:
+        raise InstallError(
+            "O Windows bloqueou a abertura do Integrador. Consulte o diagnóstico para a TI."
+        ) from exc
+    if process.poll() is not None:
+        raise InstallError(
+            f"O Integrador encerrou logo após abrir (código {process.returncode}). "
+            "Consulte o diagnóstico para a TI."
+        )
+    diagnostics.event("processo", "ok", "Integrador iniciado e permaneceu em execução")
 
 
 def _click_dom(locator) -> None:
@@ -383,18 +457,23 @@ def _automate_ui(cnpj: str, username: str, password: str,
 
 
 def install(cnpj: str, username: str, password: str, *, progress: Progress = print) -> dict:
-    require_admin()
-    cnpj = normalize_cnpj(cnpj)
-    if not username.strip() or not password:
-        raise InstallError("Informe usuário e senha do Integrador.")
-
-    progress("Validando o acesso à API")
-    api = MixApi()
-    api.login(username, password)
-    local_machine_id = find_local_machine_id()
-    prepare_files(progress)
+    diagnostics = InstallationDiagnostics(TARGET_DIR)
     machine_id = ""
+    completed = False
     try:
+        require_admin()
+        diagnostics.event("administrador", "ok", "Instalador executando elevado")
+        cnpj = normalize_cnpj(cnpj)
+        if not username.strip() or not password:
+            raise InstallError("Informe usuário e senha do Integrador.")
+
+        ensure_webview2(progress, diagnostics)
+        progress("Validando o acesso à API")
+        api = MixApi()
+        api.login(username, password)
+        diagnostics.event("api", "ok", "Autenticação confirmada")
+        local_machine_id = find_local_machine_id()
+        prepare_files(progress, diagnostics)
         with temporary_webview_debug():
             _stop_integrator()
             subprocess.Popen(
@@ -409,6 +488,7 @@ def install(cnpj: str, username: str, password: str, *, progress: Progress = pri
         # A interface nativa já instalou suas tarefas. Ativamos o monitor antes
         # das consultas finais para que uma demora da API não deixe o cliente sem proteção.
         install_monitor(progress)
+        diagnostics.event("monitor", "ok", "Tarefa de monitoramento instalada e verificada")
         progress("Confirmando cadastro na API")
         api.verify_registration(cnpj, machine_id)
         local_id = read_json(TARGET_DIR / "config" / "machine_id.json").get("machine_id")
@@ -417,12 +497,37 @@ def install(cnpj: str, username: str, password: str, *, progress: Progress = pri
             raise InstallError("O Machine ID não ficou igual nos dois arquivos locais.")
         progress("Aguardando o Machine ID ficar online no App Mix")
         api.wait_until_online(cnpj, machine_id)
-        return {"cnpj": cnpj, "machine_id": machine_id, "monitor": MONITOR_TASK}
+        diagnostics.event("cadastro", "ok", "CNPJ, serviço Mix Fiscal e Machine ID confirmados")
+        _stop_integrator()
+        _start_integrator_verified(progress, diagnostics)
+        report = diagnostics.finish("concluído", monitor=MONITOR_TASK, result="online")
+        completed = True
+        return {
+            "cnpj": cnpj, "machine_id": machine_id, "monitor": MONITOR_TASK,
+            "diagnostic": str(report),
+        }
+    except Exception as exc:
+        diagnostics.event("instalação", "erro", str(exc), exception=type(exc).__name__)
+        findings = security_protection_findings(TARGET_DIR)
+        if findings:
+            diagnostics.event(
+                "proteção", "atenção",
+                "O Microsoft Defender registrou ocorrência relacionada ao Integrador",
+                occurrences=len(findings),
+                findings=json.dumps(findings, ensure_ascii=False, default=str),
+            )
+        report = diagnostics.finish("falhou", error=exc)
+        message = str(exc) if isinstance(exc, InstallError) else f"Falha inesperada: {exc}"
+        raise InstallError(f"{message}\n\nDiagnóstico salvo em:\n{report}") from exc
     finally:
         # Fecha o processo com CDP e reabre visível, como "Abrir Interface" no ícone da bandeja.
-        _stop_integrator()
-        if machine_id and TARGET_EXE.exists():
-            subprocess.Popen(
-                [str(TARGET_EXE)], cwd=str(TARGET_DIR),
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
+        if not completed:
+            _stop_integrator()
+            if machine_id and TARGET_EXE.exists():
+                try:
+                    subprocess.Popen(
+                        [str(TARGET_EXE)], cwd=str(TARGET_DIR),
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
+                except OSError:
+                    pass

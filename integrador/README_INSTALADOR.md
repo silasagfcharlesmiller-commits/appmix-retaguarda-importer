@@ -15,6 +15,11 @@ Ao clicar em **Instalar**, ele solicita permissão de administrador e executa o 
 10. consulta a mesma listagem da API usada pelo App Mix até confirmar o ID online;
 11. remove a depuração temporária e deixa o Integrador aberto.
 
+Na geração `1.1`, o setup também confirma o WebView2 antes de abrir o Integrador, valida cada
+componente por SHA-256 e marca `desktop-integrador.exe` para sempre executar como administrador.
+Os dados de banco continuam sendo enviados e gerenciados pelo site; o setup configura CNPJ,
+arquivos locais, serviço Mix Fiscal e Machine ID.
+
 O instalador nunca limpa os arquivos de identidade. Se `config\machine_id.json` e
 `%APPDATA%\mixfiscal-integrador\local_settings.json` tiverem IDs diferentes, ele para e
 preserva os dois para revisão. A tela segue o visual do App Mix, ajusta-se à área útil do
@@ -57,6 +62,17 @@ Desde a versão `1.0.1`, o ciclo cobre `desktop-integrador.exe`, `Painel_Mix.bat
 `monitor_mix.ps1`, `run_silent.vbs` e o próprio `atualizador_mix.ps1`. O Painel Mix e a janela
 do instalador mostram a versão instalada.
 
+A tela da geração `1.1` mostra as versões do setup, Integrador, Painel BAT e WebView2, além do
+estado do monitor e da execução administrativa. O botão **Verificar ambiente e atualizações**
+repete a consulta. Quando o WebView2 está ausente, o setup baixa o bootstrapper oficial da
+Microsoft, confirma a assinatura digital, instala silenciosamente, aguarda e verifica novamente.
+
+Os componentes são copiados de forma atômica e conferidos por SHA-256. O atualizador também
+verifica os arquivos quando a versão remota é igual à local, permitindo reparar um componente
+ausente ou alterado. Os relatórios ficam em `logs\instalacao.log` e `logs\diagnostico.json`, com
+cópia de emergência em `%ProgramData%\MixFiscal\Logs`. Se a proteção remover novamente o mesmo
+arquivo, o setup informa o diagnóstico para a TI; ele não desativa antivírus, EDR ou políticas.
+
 O log fica em `atualizador_log.txt`, ao lado do Integrador. A opção **5 - Desinstalar / Desativar
 monitoramento** do Painel Mix também interrompe as verificações de atualização durante uma
 manutenção. As máquinas que já receberam uma versão antiga do instalador precisam executar
@@ -82,6 +98,7 @@ Revise e envie esses arquivos no mesmo commit. Nunca reutilize um número de ver
 - `instalador_gui.py`: tela com CNPJ, usuário e senha;
 - `automacao_primeiro_acesso.py`: automação WebView2/Wails, identidade e monitor;
 - `instalador_core.py`: validação, API e escrita JSON segura;
+- `diagnostico_instalador.py`: versões, WebView2, permissões, integridade e relatório para a TI;
 - `Painel_Mix.bat`: controle manual do monitor;
 - `atualizador_mix.ps1`: atualização validada e restauração em caso de falha;
 - `PUBLICAR_ATUALIZACAO.ps1`: gera manifesto, binário público e instalador;
@@ -92,10 +109,10 @@ Revise e envie esses arquivos no mesmo commit. Nunca reutilize um número de ver
 ## Validação e compilação
 
 ```powershell
-python -m py_compile integrador\instalador_core.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
+python -m py_compile integrador\instalador_core.py integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
 python -m unittest discover -s integrador -p test_instalador.py
 powershell -ExecutionPolicy Bypass -File integrador\GERAR_INSTALADOR.ps1
 ```
 
-Antes da distribuição ampla, execute o pacote em uma máquina Windows limpa com o
-WebView2 Runtime instalado.
+Antes da distribuição ampla, execute o pacote em uma máquina Windows limpa com o WebView2
+Runtime instalado e em outra sem o Runtime, validando a instalação oficial automática.
