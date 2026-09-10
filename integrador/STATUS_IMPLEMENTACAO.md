@@ -60,18 +60,26 @@ geração conseguem baixar, validar e abrir uma versão superior mantendo a past
 original. O diagnóstico registra ocorrências relacionadas encontradas no Microsoft Defender
 e gera informações para a TI sem alterar ou desativar a proteção da máquina.
 
+Após um antivírus bloquear a extração do pacote anterior, a geração foi trocada de PyInstaller
+`onefile` para aplicação interna `onedir` embalada pelo Inno Setup. A automação deixou de usar
+Playwright e passou a acessar diretamente o protocolo local do WebView2 por WebSocket. Com isso,
+o `node.exe` de aproximadamente 92 MB foi removido e o setup caiu de cerca de 91 MB para 36 MB.
+
 ## Validações
 
-- 19 testes locais passaram, incluindo diagnóstico, integridade dos componentes e destino dinâmico;
-- os quatro arquivos Python compilam com `py_compile`;
+- 21 testes locais passaram, incluindo diagnóstico, integridade e proteção contra retorno ao `onefile`;
+- os cinco arquivos Python principais compilam com `py_compile`;
 - o pacote contém `desktop-integrador.exe`, `Painel_Mix.bat`, `atualizador_mix.ps1`,
   `monitor_mix.ps1`, `run_silent.vbs`, `integrador_version.json` e o driver Playwright;
-- as 360 entradas do CArchive foram descompactadas; o Integrador e o Node do Playwright
-  embutidos correspondem aos arquivos de origem;
+- o runtime interno possui 11 entradas CArchive e nenhum arquivo do Playwright/Node;
+- a instalação silenciosa de validação terminou com código `0`, criou os 156 arquivos esperados
+  e respeitou o destino solicitado;
+- a verificação manual do pacote final pelo Microsoft Defender retornou zero detecções;
+- o cliente CDP conectou a um Edge local isolado, localizou um campo e o preencheu corretamente;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato candidato v1.1.0: `entrega\Instalador-Mix-Fiscal.exe`, 91.352.371 bytes;
-- SHA-256: `97E3780E1D315ADDC7B02B1AA5DDB907BF07192B637C6A6003258BEC4DE4BD9A`;
+- artefato candidato v1.1.0: `entrega\Instalador-Mix-Fiscal.exe`, 36.426.042 bytes;
+- SHA-256: `02EA3E3A0977A4C0E48AD1242FC67D1DE329C8A5976490404598D6F1CD95FCE2`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 

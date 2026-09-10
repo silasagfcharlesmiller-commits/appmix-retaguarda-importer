@@ -263,7 +263,7 @@ def maybe_start_installer_update(current_version: str, target_dir: Path) -> bool
             temporary.unlink(missing_ok=True)
             raise InstallError("A atualização do instalador não passou na validação de integridade.")
         os.replace(temporary, destination)
-    subprocess.Popen([str(destination), "--install-dir", str(target_dir)], cwd=str(target_dir))
+    subprocess.Popen([str(destination), f"/DIR={target_dir}"], cwd=str(target_dir))
     return True
 
 

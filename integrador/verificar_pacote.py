@@ -1,95 +1,87 @@
-"""Valida integralmente o CArchive gerado pelo PyInstaller."""
+"""Valida o runtime onedir e o instalador convencional gerado pelo Inno Setup."""
 
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 from pathlib import Path
 
 from PyInstaller.archive.readers import CArchiveReader
 
 
-def sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest().upper()
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest().upper()
+
+
+def mz(path: Path) -> bool:
+    try:
+        with path.open("rb") as stream:
+            return stream.read(2) == b"MZ"
+    except OSError:
+        return False
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        raise SystemExit("Uso: verificar_pacote.py <Instalador-Mix-Fiscal.exe>")
+    if len(sys.argv) != 4:
+        raise SystemExit(
+            "Uso: verificar_pacote.py <setup.exe> <runtime_dir> <payload_manifest.json>"
+        )
 
-    package = Path(sys.argv[1]).resolve()
+    setup = Path(sys.argv[1]).resolve()
+    runtime = Path(sys.argv[2]).resolve()
+    manifest_path = Path(sys.argv[3]).resolve()
     root = Path(__file__).resolve().parent
-    archive = CArchiveReader(str(package))
-    extracted: dict[str, bytes] = {}
 
+    if not setup.is_file() or setup.stat().st_size < 1_000_000 or not mz(setup):
+        raise RuntimeError("O instalador Inno Setup não é um executável Windows válido.")
+    runtime_exe = runtime / "Instalador-Mix-Fiscal-App.exe"
+    if not runtime_exe.is_file() or not mz(runtime_exe):
+        raise RuntimeError("A aplicação interna do instalador está ausente ou inválida.")
+
+    archive = CArchiveReader(str(runtime_exe))
     for name, entry in archive.toc.items():
-        typecode = entry[4]
-        if typecode in {"o", "n"}:
+        if entry[4] in {"o", "n"}:
             continue
         data = archive.extract(name)
         if len(data) != entry[2]:
-            raise RuntimeError(
-                f"Entrada {name!r} possui {len(data)} bytes; esperado: {entry[2]}."
-            )
-        if name in {
-            "Painel_Mix.bat",
-            "atualizador_mix.ps1",
-            "monitor_mix.ps1",
-            "run_silent.vbs",
-            "desktop-integrador.exe",
-            "integrador_version.json",
-            r"playwright\driver\node.exe",
-        }:
-            extracted[name] = data
+            raise RuntimeError(f"Entrada interna corrompida: {name!r}.")
 
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+    files = manifest.get("files", {})
     required = {
-        "Painel_Mix.bat",
-        "atualizador_mix.ps1",
-        "monitor_mix.ps1",
-        "run_silent.vbs",
-        "desktop-integrador.exe",
-        "integrador_version.json",
-        r"playwright\driver\node.exe",
+        "desktop-integrador.exe", "Painel_Mix.bat", "atualizador_mix.ps1",
+        "monitor_mix.ps1", "run_silent.vbs", "integrador_version.json",
     }
-    missing = required.difference(archive.toc)
-    if missing:
-        raise RuntimeError(f"Arquivos obrigatorios ausentes: {sorted(missing)}")
+    if set(files) != required:
+        raise RuntimeError("O manifesto interno não contém exatamente os componentes esperados.")
+    for name, metadata in files.items():
+        source = root / name
+        if not source.is_file():
+            raise RuntimeError(f"Componente de origem ausente: {name}.")
+        if source.stat().st_size != int(metadata["size"]) or sha256(source) != metadata["sha256"]:
+            raise RuntimeError(f"Manifesto interno não corresponde a {name}.")
 
-    source_integrator = (root / "desktop-integrador.exe").read_bytes()
-    if sha256(extracted["desktop-integrador.exe"]) != sha256(source_integrator):
-        raise RuntimeError("O Integrador embutido difere do arquivo de origem.")
+    forbidden = [
+        path for path in runtime.rglob("*")
+        if path.name.casefold() == "node.exe"
+        or any(part.casefold() == "playwright" for part in path.parts)
+    ]
+    if forbidden:
+        raise RuntimeError(f"Playwright/Node ainda foi incluído no runtime: {forbidden[0]}")
 
-    for asset_name in (
-        "Painel_Mix.bat", "atualizador_mix.ps1", "monitor_mix.ps1",
-        "run_silent.vbs", "integrador_version.json",
-    ):
-        source_asset = (root / asset_name).read_bytes()
-        if sha256(extracted[asset_name]) != sha256(source_asset):
-            raise RuntimeError(f"O arquivo {asset_name} embutido difere da origem.")
+    embedded_manifest = runtime / "_internal" / "payload_manifest.json"
+    if not embedded_manifest.is_file() or sha256(embedded_manifest) != sha256(manifest_path):
+        raise RuntimeError("O manifesto de componentes não foi incorporado ao runtime.")
 
-    panel = extracted["Painel_Mix.bat"]
-    if panel.count(b"\n") < 150 or b"\\n" in panel:
-        raise RuntimeError("O Painel_Mix.bat nao possui quebras de linha validas.")
-
-    source_node = (
-        Path(sys.executable).resolve().parent.parent
-        / "Lib"
-        / "site-packages"
-        / "playwright"
-        / "driver"
-        / "node.exe"
+    print(
+        f"Pacote convencional íntegro: runtime com {len(archive.toc)} entradas, "
+        f"sem Playwright/Node; setup {setup.stat().st_size} bytes; SHA-256 {sha256(setup)}."
     )
-    if not source_node.is_file():
-        raise RuntimeError(f"Node do Playwright nao encontrado em {source_node}.")
-    if sha256(extracted[r"playwright\driver\node.exe"]) != sha256(source_node.read_bytes()):
-        raise RuntimeError("O Node do Playwright embutido difere do arquivo de origem.")
-
-    with package.open("rb") as stream:
-        mz_header = stream.read(2)
-    if mz_header != b"MZ":
-        raise RuntimeError("O pacote nao possui cabecalho executavel MZ.")
-
-    print(f"Pacote integro: {len(archive.toc)} entradas descompactadas e validadas.")
     return 0
 
 

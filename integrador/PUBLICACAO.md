@@ -18,6 +18,13 @@ Exemplos: `1.0.0` → `1.0.1` para correção, `1.0.1` → `1.1.0` para funciona
 
 ## 2. Gerar todos os artefatos
 
+O build da geração `1.1` requer o Inno Setup 6. Se `ISCC.exe` não estiver disponível, instale-o
+uma vez com:
+
+```powershell
+winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
+```
+
 Use este comando, trocando a versão e o caminho do novo executável:
 
 ```powershell
@@ -33,10 +40,11 @@ O script realiza em conjunto:
   `web/public/integrador-updates/desktop-integrador.exe`;
 - gera `web/public/integrador-updates/version.json` sem BOM, com versão, tamanho e SHA-256;
 - atualiza `integrador/integrador_version.json`;
-- recompila `integrador/entrega/Instalador-Mix-Fiscal.exe` como administrador;
-- descompacta todas as entradas do instalador e compara o Integrador e o Node do Playwright
-  com os arquivos de origem; um pacote corrompido é removido e o build tenta novamente, no
-  máximo três vezes;
+- gera a aplicação interna em modo `onedir`, sem a autoextração `onefile` e sem Playwright/Node;
+- compila `integrador/entrega/Instalador-Mix-Fiscal.exe` como um setup convencional pelo Inno
+  Setup, com solicitação de administrador;
+- valida o runtime interno, o manifesto dos componentes, a ausência de Playwright/Node e o
+  cabeçalho do pacote final;
 - copia o instalador para `web/public/downloads/Instalador-Mix-Fiscal.exe`.
 
 Não edite o manifesto ou copie esses arquivos manualmente.
@@ -44,7 +52,7 @@ Não edite o manifesto ou copie esses arquivos manualmente.
 ## 3. Validar antes do commit
 
 ```powershell
-python -m py_compile integrador\instalador_core.py integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
+python -m py_compile integrador\instalador_core.py integrador\cdp_browser.py integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
 Push-Location integrador
 python -m unittest test_instalador.py
 Pop-Location

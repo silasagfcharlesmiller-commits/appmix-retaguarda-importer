@@ -19,6 +19,7 @@ from typing import Callable
 import urllib.request
 import winreg
 
+from cdp_browser import CdpPage
 from diagnostico_instalador import (
     InstallationDiagnostics, configure_run_as_admin, ensure_webview2,
     is_run_as_admin_configured, probe_directory, security_protection_findings, sha256_file,
@@ -56,6 +57,8 @@ def _source_exe() -> Path:
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     source = base / "desktop-integrador.exe"
     if not source.is_file():
+        source = TARGET_DIR / "desktop-integrador.exe"
+    if not source.is_file():
         raise InstallError("desktop-integrador.exe não foi encontrado junto do instalador.")
     return source
 
@@ -63,6 +66,8 @@ def _source_exe() -> Path:
 def _source_asset(name: str) -> Path:
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     source = base / name
+    if not source.is_file():
+        source = TARGET_DIR / name
     if not source.is_file():
         raise InstallError(f"{name} não foi encontrado junto do instalador.")
     return source
@@ -135,6 +140,36 @@ def _copy_verified(source: Path, destination: Path) -> str:
     ) from last_error
 
 
+def _verify_payload_manifest() -> None:
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    manifest_path = base / "payload_manifest.json"
+    if not manifest_path.is_file():
+        return
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        raise InstallError("O manifesto interno dos componentes é inválido.") from exc
+    files = manifest.get("files", {}) if isinstance(manifest, dict) else {}
+    if not isinstance(files, dict) or not files:
+        raise InstallError("O manifesto interno não contém os componentes.")
+    for name, metadata in files.items():
+        destination = TARGET_DIR / name
+        try:
+            expected_size = int(metadata["size"])
+            expected_hash = str(metadata["sha256"]).upper()
+        except (KeyError, TypeError, ValueError) as exc:
+            raise InstallError(f"Metadados internos inválidos para {name}.") from exc
+        if (
+            not destination.is_file()
+            or destination.stat().st_size != expected_size
+            or sha256_file(destination) != expected_hash
+        ):
+            raise InstallError(
+                f"O componente {name} foi removido ou alterado durante a instalação. "
+                "Consulte o diagnóstico para a TI."
+            )
+
+
 def prepare_files(progress: Progress, diagnostics: InstallationDiagnostics | None = None) -> None:
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
     probe_directory(TARGET_DIR)
@@ -150,6 +185,7 @@ def prepare_files(progress: Progress, diagnostics: InstallationDiagnostics | Non
         destination = TARGET_DIR / name
         source = _source_asset(name)
         installed[name] = _copy_verified(source, destination)
+    _verify_payload_manifest()
     configure_run_as_admin(TARGET_EXE)
     if not is_run_as_admin_configured(TARGET_EXE):
         raise InstallError("A execução permanente como administrador não foi confirmada.")
@@ -267,26 +303,14 @@ def _start_integrator_verified(progress: Progress, diagnostics: InstallationDiag
     diagnostics.event("processo", "ok", "Integrador iniciado e permaneceu em execução")
 
 
-def _click_dom(locator) -> None:
-    # A janela fica oculta; clique por coordenadas falha quando está fora do viewport.
-    locator.evaluate("element => element.click()")
-
-
-def _visible(locator) -> bool:
-    try:
-        return locator.count() > 0 and locator.first.is_visible()
-    except Exception:
-        return False
-
-
 def _persist_native_id(page, machine_id: str) -> None:
     result = page.evaluate(
-        """async id => {
+        f"""(async () => {{
+            const id = {json.dumps(machine_id)};
             const settings = await window.go.app.App.GetLocalSettings();
-            await window.go.app.App.SaveLocalSettings({...settings, machine_id: id});
+            await window.go.app.App.SaveLocalSettings({{...settings, machine_id: id}});
             return await window.go.app.App.LoadSavedMachineID();
-        }""",
-        machine_id,
+        }})()""",
     )
     if result != machine_id:
         raise InstallError("O Integrador não confirmou o Machine ID no disco.")
@@ -294,92 +318,74 @@ def _persist_native_id(page, machine_id: str) -> None:
 
 def _open_settings_with_login(page, username: str, password: str, progress: Progress) -> None:
     """Abre Configurações pelo menu e conclui a confirmação de acesso."""
-    heading = page.get_by_role("heading", name="Configurações", exact=True)
-
     # A busca inicial pode encaminhar diretamente para Configurações. Voltamos ao
     # Dashboard para que o clique no menu execute a confirmação de acesso prevista pelo app.
-    if _visible(heading):
-        dashboard = page.get_by_text("Dashboard", exact=True)
-        if not _visible(dashboard):
+    if page.visible_text("Configurações", "h1,h2,h3"):
+        if not page.visible_text("Dashboard", "a,button"):
             raise InstallError("Não foi possível retornar ao Dashboard para confirmar o acesso.")
-        _click_dom(dashboard)
-        heading.wait_for(state="hidden", timeout=15_000)
+        page.click_text("Dashboard", "a,button")
+        page.wait_text_hidden("Configurações")
 
-    if not _visible(heading):
+    if not page.visible_text("Configurações", "h1,h2,h3"):
         progress("Abrindo Configurações do Integrador")
-        config_link = page.get_by_text("Configurações", exact=True)
-        config_link.wait_for(state="visible", timeout=20_000)
-        _click_dom(config_link)
-
-        page.wait_for_function(
-            """() => {
+        page.wait_text("Configurações", 20, "a,button")
+        page.click_text("Configurações", "a,button")
+        page.wait(
+            """(() => {
                 const confirm = [...document.querySelectorAll('button')]
                     .some(e => e.innerText.trim() === 'Confirmar');
                 const title = [...document.querySelectorAll('h1,h2,h3')]
                     .some(e => e.innerText.trim() === 'Configurações');
                 return confirm || title;
-            }""",
-            timeout=20_000,
+            })()""",
+            20, "A tela de Configurações não apareceu.",
         )
 
-    confirm = page.get_by_role("button", name="Confirmar", exact=True)
-    if _visible(confirm):
+    if page.visible_text("Confirmar", "button"):
         progress("Confirmando o login em Configurações")
-        protected_login = page.get_by_placeholder("Email ou CPF/CNPJ", exact=True)
-        protected_login.fill(username)
-        page.get_by_placeholder("Senha", exact=True).fill(password)
-        _click_dom(confirm)
+        page.fill_placeholder("Email ou CPF/CNPJ", username)
+        page.fill_placeholder("Senha", password)
+        page.click_text("Confirmar", "button")
 
-    heading.wait_for(state="visible", timeout=25_000)
+    page.wait_text("Configurações", 25, "h1,h2,h3")
 
 
 def _install_from_settings(page, progress: Progress) -> None:
     progress("Instalando a inicialização automática")
-    status = page.evaluate("() => window.go.app.App.GetWindowsServiceStatus()")
-    install_button = page.get_by_role("button", name="Instalar", exact=True)
+    status = page.evaluate("window.go.app.App.GetWindowsServiceStatus()")
     if status == "not_installed":
-        install_button.wait_for(state="visible", timeout=15_000)
-        install_button.scroll_into_view_if_needed()
+        page.wait_text("Instalar", 15, "button")
         progress("Clicando em Instalar")
-        _click_dom(install_button)
+        page.click_text("Instalar", "button")
 
     deadline = time.monotonic() + 35
     while time.monotonic() < deadline:
-        status = page.evaluate("() => window.go.app.App.GetWindowsServiceStatus()")
+        status = page.evaluate("window.go.app.App.GetWindowsServiceStatus()")
         if status == "running":
             return
         if status == "stopped":
-            start_button = page.get_by_role("button", name="Iniciar", exact=True)
-            if start_button.count():
-                _click_dom(start_button)
+            if page.visible_text("Iniciar", "button"):
+                page.click_text("Iniciar", "button")
         time.sleep(0.5)
     raise InstallError(f"A inicialização não ficou ativa; estado atual: {status!r}.")
 
 
 def _automate_ui(cnpj: str, username: str, password: str,
                  expected_id: str, progress: Progress) -> str:
+    page = CdpPage(DEBUG_PORT)
     try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
-        raise InstallError("O componente Playwright não está incluído no instalador.") from exc
-
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{DEBUG_PORT}")
-        page = browser.contexts[0].pages[0]
         if page.url == "about:blank":
-            page.goto("http://wails.localhost/", wait_until="domcontentloaded")
+            page.navigate("http://wails.localhost/")
 
-        login = page.get_by_placeholder("Email ou CPF/CNPJ", exact=True)
-        if _visible(login):
+        if page.visible_placeholder("Email ou CPF/CNPJ"):
             progress("Autenticando no Integrador")
-            login.fill(username)
-            page.locator("input[type=password]").fill(password)
-            _click_dom(page.get_by_role("button", name="Entrar", exact=True))
-            login.wait_for(state="detached", timeout=25_000)
+            page.fill_placeholder("Email ou CPF/CNPJ", username)
+            page.fill_password(password)
+            page.click_text("Entrar", "button")
+            page.wait_placeholder_hidden("Email ou CPF/CNPJ", 25)
 
         progress("Aproveitando a identidade gerada pelo Integrador")
-        saved_id = page.evaluate("() => window.go.app.App.LoadSavedMachineID()")
-        new_setup = page.get_by_role("button", name="Iniciar nova configuracao", exact=True)
+        saved_id = page.evaluate("window.go.app.App.LoadSavedMachineID()")
         if expected_id:
             machine_id = expected_id
             if saved_id and saved_id != expected_id:
@@ -389,64 +395,58 @@ def _automate_ui(cnpj: str, username: str, password: str,
                 )
         elif saved_id:
             machine_id = saved_id
-        elif _visible(new_setup):
+        elif page.visible_text("iniciar nova configuracao", "button", normalize=True):
             # Este clique chama EnsureMachineIDForNewClient dentro da própria tela.
             # Lemos o valor exibido; não chamamos o gerador uma segunda vez.
-            _click_dom(new_setup)
-            generated = page.locator("input.machine-generated-id-input")
-            generated.wait_for(state="visible", timeout=15_000)
-            machine_id = generated.input_value()
+            page.click_text("iniciar nova configuracao", "button", normalize=True)
+            page.wait_css("input.machine-generated-id-input", 15)
+            machine_id = page.input_value("input.machine-generated-id-input")
         else:
             # Retomada defensiva caso uma versão futura não mostre o modal inicial.
-            machine_id = page.evaluate("() => window.go.app.App.EnsureMachineIDForNewClient()")
+            machine_id = page.evaluate("window.go.app.App.EnsureMachineIDForNewClient()")
         machine_id = validate_machine_id(machine_id)
 
         # O ID é salvo antes de qualquer clique posterior. Se houver falha, a nova
         # execução retoma exatamente a mesma identidade.
         _persist_native_id(page, machine_id)
 
-        legacy = page.get_by_placeholder("Informe o machine_id legado", exact=True)
-        if _visible(legacy):
-            legacy.fill(machine_id)
-            _click_dom(page.get_by_role("button", name="Buscar e configurar aplicacao", exact=True))
-            page.wait_for_function(
-                """() => {
+        if page.visible_placeholder("Informe o machine_id legado"):
+            page.fill_placeholder("Informe o machine_id legado", machine_id)
+            page.click_text("buscar e configurar aplicacao", "button", normalize=True)
+            page.wait(
+                """(() => {
                     const config = [...document.querySelectorAll('h1,h2,h3')]
                         .some(e => e.innerText.trim() === 'Configurações');
                     const dashboard = [...document.querySelectorAll('a,button')]
                         .some(e => e.innerText.trim() === 'Dashboard');
                     return config || dashboard;
-                }""",
-                timeout=25_000,
+                })()""",
+                25, "O Integrador não abriu a configuração do Machine ID.",
             )
 
         _open_settings_with_login(page, username, password, progress)
 
         progress("Vinculando o CNPJ ao serviço Mix Fiscal")
-        cnpj_input = page.get_by_placeholder("00.000.000/0001-00", exact=True).first
-        cnpj_input.wait_for(state="visible", timeout=20_000)
-        cnpj_input.fill(cnpj)
+        page.wait_placeholder("00.000.000/0001-00", 20)
+        page.fill_placeholder("00.000.000/0001-00", cnpj)
         has_service = page.evaluate(
-            """() => { try {
+            """(() => { try {
                 const config = JSON.parse(localStorage.getItem('mxf_config') || '{}');
                 return (config.tag_service || []).includes('mixfiscal');
-            } catch { return false; } }"""
+            } catch { return false; } })()"""
         )
         if not has_service:
-            service = page.locator("select").filter(has=page.locator("option[value=mixfiscal]"))
-            service.select_option("mixfiscal")
-            _click_dom(service.locator("..").get_by_role("button", name="Adicionar", exact=True))
-        save_button = page.get_by_role("button", name="Salvar Configurações", exact=True)
-        save_button.scroll_into_view_if_needed()
-        page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
+            page.add_select_option("mixfiscal", "Adicionar")
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         progress("Salvando CNPJ e serviço Mix Fiscal")
-        _click_dom(save_button)
-        page.wait_for_function(
-            """cnpj => { try {
-                const config = JSON.parse(localStorage.getItem('mxf_config') || '{}');
-                return config.cnpj_cpf === cnpj && (config.tag_service || []).includes('mixfiscal');
-            } catch { return false; } }""",
-            arg=cnpj, timeout=30_000,
+        page.click_text("Salvar Configurações", "button")
+        page.wait(
+            f"""(() => {{ try {{
+                const config = JSON.parse(localStorage.getItem('mxf_config') || '{{}}');
+                return config.cnpj_cpf === {json.dumps(cnpj)} &&
+                    (config.tag_service || []).includes('mixfiscal');
+            }} catch {{ return false; }} }})()""",
+            30, "O CNPJ e o serviço Mix Fiscal não foram confirmados após salvar.",
         )
 
         _persist_native_id(page, machine_id)
@@ -454,6 +454,8 @@ def _automate_ui(cnpj: str, username: str, password: str,
         _install_from_settings(page, progress)
         progress("Instalação ativa; preparando a abertura da interface")
         return machine_id
+    finally:
+        page.close()
 
 
 def install(cnpj: str, username: str, password: str, *, progress: Progress = print) -> dict:

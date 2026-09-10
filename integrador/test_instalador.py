@@ -9,12 +9,33 @@ from unittest.mock import patch
 from automacao_primeiro_acesso import (
     _copy_verified, find_local_machine_id, install_monitor, installer_directory,
 )
+from cdp_browser import CdpPage
 from diagnostico_instalador import InstallationDiagnostics, probe_directory, sha256_file
 from instalador_core import (InstallError, MixApi, atomic_json, generate_machine_id,
                             normalize_cnpj, read_json, registration_payload, validate_machine_id)
 
 
 class InstallerTests(unittest.TestCase):
+    def test_cdp_visibility_expression_is_balanced(self):
+        expression = CdpPage._visible("document.body")
+        self.assertTrue(expression.startswith("(()=>{"))
+        self.assertTrue(expression.endswith("})()"))
+        self.assertNotIn("}})()", expression)
+
+    def test_packaging_avoids_onefile_playwright_and_node(self):
+        root = Path(__file__).parent
+        generator = (root / "GERAR_INSTALADOR.ps1").read_text(encoding="utf-8-sig")
+        requirements = (root / "requirements-instalador.txt").read_text(encoding="utf-8-sig")
+        automation = (root / "automacao_primeiro_acesso.py").read_text(encoding="utf-8-sig")
+        self.assertIn("--onedir", generator)
+        self.assertIn("Inno Setup", generator)
+        self.assertNotIn("--onefile", generator)
+        self.assertNotIn("--collect-all playwright", generator)
+        self.assertIn("websocket-client", requirements)
+        self.assertNotIn("playwright", requirements.casefold())
+        self.assertIn("CdpPage", automation)
+        self.assertNotIn("sync_playwright", automation)
+
     def test_panel_batch_has_real_lines_and_monitor_actions(self):
         panel = (Path(__file__).parent / "Painel_Mix.bat").read_bytes()
         self.assertGreater(panel.count(b"\n"), 150)

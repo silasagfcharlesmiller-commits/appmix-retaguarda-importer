@@ -73,6 +73,12 @@ ausente ou alterado. Os relatórios ficam em `logs\instalacao.log` e `logs\diagn
 cópia de emergência em `%ProgramData%\MixFiscal\Logs`. Se a proteção remover novamente o mesmo
 arquivo, o setup informa o diagnóstico para a TI; ele não desativa antivírus, EDR ou políticas.
 
+O pacote `1.1` usa Inno Setup e instala a aplicação auxiliar em `.mix-installer`. Essa aplicação
+fica em formato de pasta e não precisa descompactar Python a cada abertura. A automação conversa
+diretamente com o protocolo local do WebView2 por WebSocket; Playwright e o `node.exe` de cerca
+de 92 MB não fazem mais parte do instalador. O build falha se detectar novamente qualquer um
+desses componentes.
+
 O log fica em `atualizador_log.txt`, ao lado do Integrador. A opção **5 - Desinstalar / Desativar
 monitoramento** do Painel Mix também interrompe as verificações de atualização durante uma
 manutenção. As máquinas que já receberam uma versão antiga do instalador precisam executar
@@ -98,6 +104,7 @@ Revise e envie esses arquivos no mesmo commit. Nunca reutilize um número de ver
 - `instalador_gui.py`: tela com CNPJ, usuário e senha;
 - `automacao_primeiro_acesso.py`: automação WebView2/Wails, identidade e monitor;
 - `instalador_core.py`: validação, API e escrita JSON segura;
+- `cdp_browser.py`: comunicação direta com a porta local do WebView2, sem Playwright;
 - `diagnostico_instalador.py`: versões, WebView2, permissões, integridade e relatório para a TI;
 - `Painel_Mix.bat`: controle manual do monitor;
 - `atualizador_mix.ps1`: atualização validada e restauração em caso de falha;
@@ -105,14 +112,17 @@ Revise e envie esses arquivos no mesmo commit. Nunca reutilize um número de ver
 - `verificar_pacote.py`: descompacta e valida integralmente o pacote antes da publicação;
 - `test_instalador.py`: testes locais sem alterar a API;
 - `GERAR_INSTALADOR.ps1`: recompila o EXE com UAC.
+- `Instalador-Mix-Fiscal.iss`: definição do pacote convencional do Inno Setup.
 
 ## Validação e compilação
 
 ```powershell
-python -m py_compile integrador\instalador_core.py integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
+python -m py_compile integrador\instalador_core.py integrador\cdp_browser.py integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
 python -m unittest discover -s integrador -p test_instalador.py
 powershell -ExecutionPolicy Bypass -File integrador\GERAR_INSTALADOR.ps1
 ```
 
 Antes da distribuição ampla, execute o pacote em uma máquina Windows limpa com o WebView2
-Runtime instalado e em outra sem o Runtime, validando a instalação oficial automática.
+Runtime instalado e em outra sem o Runtime, validando a instalação oficial automática. Um
+certificado de assinatura de código da Mix Fiscal continua recomendado para reduzir alertas de
+reputação em antivírus corporativos e no SmartScreen.

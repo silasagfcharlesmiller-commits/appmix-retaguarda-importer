@@ -2,7 +2,7 @@
     "schema":  2,
     "version":  "1.1.0",
     "channel":  "stable",
-    "published_at":  "2026-09-10T14:23:46.0024742+00:00",
+    "published_at":  "2026-09-10T16:50:32.8127235+00:00",
     "executable":  {
                        "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.1.0",
                        "sha256":  "EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8",
@@ -42,7 +42,7 @@
               ],
     "installer":  {
                       "url":  "https://appmix-retaguarda-importer.vercel.app/downloads/Instalador-Mix-Fiscal.exe?v=1.1.0",
-                      "sha256":  "97E3780E1D315ADDC7B02B1AA5DDB907BF07192B637C6A6003258BEC4DE4BD9A",
-                      "size":  91352371
+                      "sha256":  "02EA3E3A0977A4C0E48AD1242FC67D1DE329C8A5976490404598D6F1CD95FCE2",
+                      "size":  36426042
                   }
 }
