@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableExtensions EnableDelayedExpansion
 :: ============================================================================
 :: PAINEL DE CONTROLE MIX FISCAL - MONITOR AUTOMATICO INVISIVEL
 :: Baseado no Painel Mix fornecido pelo operador.
@@ -7,15 +8,20 @@
 :: Solicita permissao administrativa quando aberto manualmente.
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -WorkingDirectory '%~dp0' -Verb RunAs"
-    if errorlevel 1 (
+    if "%~1"=="" (
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$p=Start-Process -FilePath '%~f0' -WorkingDirectory '%~dp0' -Verb RunAs -Wait -PassThru; exit $p.ExitCode"
+    ) else (
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$p=Start-Process -FilePath '%~f0' -ArgumentList '%~1' -WorkingDirectory '%~dp0' -Verb RunAs -Wait -PassThru; exit $p.ExitCode"
+    )
+    set "RESULTADO_ELEVADO=!errorlevel!"
+    if not "!RESULTADO_ELEVADO!"=="0" (
         echo.
         echo ERRO: nao foi possivel solicitar permissao de administrador.
         echo Clique com o BOTAO DIREITO e escolha "Executar como administrador".
         echo.
         pause
     )
-    exit /b
+    exit /b !RESULTADO_ELEVADO!
 )
 
 :: Usa sempre a pasta onde este Painel_Mix.bat esta localizado.

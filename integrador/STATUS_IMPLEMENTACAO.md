@@ -36,7 +36,7 @@ ele também pode ter qualquer outro nome.
 O Painel Mix usa quebras de linha reais, sem BOM, e solicita elevação administrativa ao ser aberto.
 Há um teste que impede publicar novamente o BAT com sequências `\n` literais.
 
-O monitor agora executa o atualizador antes de verificar o processo. A versão `1.0.2`
+O monitor agora executa o atualizador antes de verificar o processo. A versão `1.0.3`
 consulta o manifesto público do site, aceita somente downloads HTTPS do domínio configurado e
 atualiza cinco componentes: Integrador, Painel Mix, monitor, lançador silencioso e o próprio
 atualizador. Cada arquivo tem tamanho e SHA-256 validados; executáveis também têm o cabeçalho
@@ -57,8 +57,8 @@ instala, consulta e desinstala o monitor sem deixar tarefas antigas duplicadas.
   embutidos correspondem aos arquivos de origem;
 - o manifesto do pacote solicita `requireAdministrator`;
 - interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.332.414 bytes;
-- SHA-256: `677AB85113267EADF89615EE7701FEE9F2E70F8D2F69247D32ADB8E32C4280A5`;
+- artefato: `entrega\Instalador-Mix-Fiscal.exe`, 91.330.334 bytes;
+- SHA-256: `0CF2F7C0C90BDA0CB6C74125622DDBCC1967D131B1CEB75AB0598FBC6CB6E684`;
 - o pacote ainda não possui assinatura digital;
 - a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
 

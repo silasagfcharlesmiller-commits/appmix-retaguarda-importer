@@ -1,41 +1,41 @@
 {
     "schema":  2,
-    "version":  "1.0.2",
+    "version":  "1.0.3",
     "channel":  "stable",
-    "published_at":  "2026-09-10T13:29:11.0121614+00:00",
+    "published_at":  "2026-09-10T13:38:34.9918201+00:00",
     "executable":  {
-                       "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.0.2",
+                       "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.0.3",
                        "sha256":  "EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8",
                        "size":  44513792
                    },
     "files":  [
                   {
                       "name":  "desktop-integrador.exe",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.0.2",
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.0.3",
                       "sha256":  "EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8",
                       "size":  44513792
                   },
                   {
                       "name":  "Painel_Mix.bat",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/Painel_Mix.bat?v=1.0.2",
-                      "sha256":  "F0F9562DA7A85F6F1BAE07472D7D4C1257FC7E1D96ED5D9991D786288058B59F",
-                      "size":  7650
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/Painel_Mix.bat?v=1.0.3",
+                      "sha256":  "B9548381BC0A6EC400510A7E5382D71BFF659619D4125A0AF14DC33DE4629261",
+                      "size":  8052
                   },
                   {
                       "name":  "monitor_mix.ps1",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/monitor_mix.ps1?v=1.0.2",
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/monitor_mix.ps1?v=1.0.3",
                       "sha256":  "C61ABA88C95E375BE8BF71AEF51BF0FEC0DD350D1157B1CD67240DD7418ED717",
                       "size":  1255
                   },
                   {
                       "name":  "run_silent.vbs",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/run_silent.vbs?v=1.0.2",
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/run_silent.vbs?v=1.0.3",
                       "sha256":  "031287807A8C41F95F57B57071329A8F6CB48A6578675B714A1AA1B5871AB327",
                       "size":  297
                   },
                   {
                       "name":  "atualizador_mix.ps1",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/atualizador_mix.ps1?v=1.0.2",
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/atualizador_mix.ps1?v=1.0.3",
                       "sha256":  "04D109089A29BCB858E6308107AD1396A67B193105ADFC643372AC829DBA3374",
                       "size":  8956
                   }

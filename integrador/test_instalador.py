@@ -24,6 +24,8 @@ class InstallerTests(unittest.TestCase):
         self.assertIn(b"RESULTADO_TAREFA", panel)
         self.assertIn(b"VERSAO_INSTALADA", panel)
         self.assertIn(b"wscript.exe", panel)
+        self.assertIn(b"-ArgumentList '%~1'", panel)
+        self.assertIn(b"-Wait -PassThru", panel)
 
     def test_updater_covers_all_installed_components(self):
         root = Path(__file__).parent
