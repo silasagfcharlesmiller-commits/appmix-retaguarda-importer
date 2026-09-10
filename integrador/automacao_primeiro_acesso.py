@@ -114,7 +114,7 @@ def prepare_files(progress: Progress) -> None:
 
 
 def install_monitor(progress: Progress) -> None:
-    """Instala o monitor do Painel Mix sem abrir o menu interativo do BAT."""
+    """Instala o monitor pelo Painel Mix, sem exibir uma janela de console."""
     progress("Instalando o monitor automático do Integrador")
     script = TARGET_DIR / "monitor_mix.ps1"
     monitor_source = _source_asset("monitor_mix.ps1")
@@ -126,27 +126,30 @@ def install_monitor(progress: Progress) -> None:
         shutil.copy2(launcher_source, launcher)
     if not script.is_file() or not launcher.is_file():
         raise InstallError("Os arquivos do monitor não foram instalados.")
-    task_command = (
-        'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass '
-        f'-File "{script}"'
-    )
+
+    panel = TARGET_DIR / "Painel_Mix.bat"
+    if not panel.is_file():
+        raise InstallError("Painel_Mix.bat não foi encontrado na pasta da instalação.")
     result = subprocess.run(
-        [
-            "schtasks.exe", "/Create", "/TN", MONITOR_TASK, "/TR", task_command,
-            "/SC", "MINUTE", "/MO", "5", "/RL", "HIGHEST", "/F",
-        ],
-        check=False, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
+        ["cmd.exe", "/D", "/C", "call", str(panel), "--install-monitor"],
+        cwd=str(TARGET_DIR), check=False, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    (TARGET_DIR / "painel_install_log.txt").write_text(
+        (result.stdout or "") + (result.stderr or ""), encoding="utf-8"
     )
     if result.returncode:
-        raise InstallError("Não foi possível instalar a tarefa do Monitor Mix Fiscal.")
+        raise InstallError(
+            "O Painel Mix não conseguiu instalar a tarefa do monitor. "
+            "Consulte painel_install_log.txt."
+        )
     check = subprocess.run(
         ["schtasks.exe", "/Query", "/TN", MONITOR_TASK],
         check=False, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
     )
     if check.returncode:
         raise InstallError("A tarefa do Monitor Mix Fiscal não foi encontrada após a instalação.")
-    progress("Monitor do Windows instalado e verificado")
-
+    progress("Monitor do Windows instalado pelo Painel Mix e verificado")
 
 @contextmanager
 def temporary_webview_debug():

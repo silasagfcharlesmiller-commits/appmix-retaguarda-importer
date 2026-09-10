@@ -11,7 +11,7 @@ Ao clicar em **Instalar**, ele solicita permissão de administrador e executa o 
 6. abre **Configurações** pelo menu e confirma novamente o login;
 7. preenche o CNPJ, adiciona o serviço `mixfiscal` somente se ele ainda não estiver selecionado, rola até o final e salva;
 8. clica em **Instalar** na tela do Integrador e ativa a inicialização nativa;
-9. instala e consulta a tarefa do monitor silencioso de cinco minutos;
+9. chama `Painel_Mix.bat --install-monitor`, instala a tarefa invisível por VBS e a consulta;
 10. consulta a mesma listagem da API usada pelo App Mix até confirmar o ID online;
 11. remove a depuração temporária e deixa o Integrador aberto.
 
@@ -31,8 +31,8 @@ Antes de executar, crie a pasta desejada, por exemplo `C:\Mix Fiscal\integrador`
 componentes para essa mesma pasta. Abra esse painel quando
 precisar fazer manutenção; ele solicita automaticamente a permissão de administrador:
 
-- **2 - Monitorar Integrador**: instala ou reativa o monitor e reativa as tarefas nativas;
-- **5 - Parar Monitoramento**: remove o monitor extra e desativa `BootStart`, `Startup` e
+- **2 - Instalar / Ativar monitoramento**: instala ou reativa o monitor invisível e as tarefas nativas;
+- **5 - Desinstalar / Desativar monitoramento**: remove a tarefa do monitor e desativa `BootStart`, `Startup` e
   `Watchdog` do Integrador;
 - **4 - Parar Integrador**: encerra o processo depois que o monitoramento foi parado.
 
@@ -57,8 +57,8 @@ Desde a versão `1.0.1`, o ciclo cobre `desktop-integrador.exe`, `Painel_Mix.bat
 `monitor_mix.ps1`, `run_silent.vbs` e o próprio `atualizador_mix.ps1`. O Painel Mix e a janela
 do instalador mostram a versão instalada.
 
-O log fica em `atualizador_log.txt`, ao lado do Integrador. A opção **5 - Parar
-Monitoramento** do Painel Mix também interrompe as verificações de atualização durante uma
+O log fica em `atualizador_log.txt`, ao lado do Integrador. A opção **5 - Desinstalar / Desativar
+monitoramento** do Painel Mix também interrompe as verificações de atualização durante uma
 manutenção. As máquinas que já receberam uma versão antiga do instalador precisam executar
 o novo pacote uma vez; a partir daí, as versões seguintes são automáticas.
 

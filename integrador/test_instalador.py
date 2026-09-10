@@ -16,12 +16,14 @@ class InstallerTests(unittest.TestCase):
         panel = (Path(__file__).parent / "Painel_Mix.bat").read_bytes()
         self.assertGreater(panel.count(b"\n"), 150)
         self.assertNotIn(b"\\n", panel)
-        self.assertIn(b"MONITORAR INTEGRADOR", panel)
-        self.assertIn(b"PARAR MONITORAMENTO", panel)
+        self.assertIn(b"MONITOR AUTOMATICO INVISIVEL", panel)
+        self.assertIn(b"DESINSTALAR / DESATIVAR", panel)
         self.assertIn(b"atualizador_mix.ps1", panel)
         self.assertIn(b"--install-monitor", panel)
+        self.assertIn(b"--stop-monitor", panel)
         self.assertIn(b"RESULTADO_TAREFA", panel)
         self.assertIn(b"VERSAO_INSTALADA", panel)
+        self.assertIn(b"wscript.exe", panel)
 
     def test_updater_covers_all_installed_components(self):
         root = Path(__file__).parent
@@ -125,7 +127,10 @@ class InstallerTests(unittest.TestCase):
     def test_monitor_script_and_task_are_installed_and_verified(self):
         with tempfile.TemporaryDirectory() as temp:
             target = Path(temp)
-            completed = SimpleNamespace(returncode=0)
+            (target / "Painel_Mix.bat").write_bytes(
+                (Path(__file__).parent / "Painel_Mix.bat").read_bytes()
+            )
+            completed = SimpleNamespace(returncode=0, stdout="", stderr="")
             with patch("automacao_primeiro_acesso.TARGET_DIR", target), \
                  patch("automacao_primeiro_acesso.subprocess.run", return_value=completed) as run:
                 install_monitor(lambda _message: None)
@@ -137,7 +142,12 @@ class InstallerTests(unittest.TestCase):
             self.assertIn("-Filter '*.exe'", monitor)
             self.assertNotIn(r"C:\mix fiscal\integracao", monitor)
             self.assertEqual(run.call_count, 2)
-            self.assertIn("/Create", run.call_args_list[0].args[0])
+            self.assertIn("cmd.exe", run.call_args_list[0].args[0])
+            self.assertIn("--install-monitor", run.call_args_list[0].args[0])
+            self.assertEqual(
+                run.call_args_list[0].kwargs["creationflags"],
+                __import__("subprocess").CREATE_NO_WINDOW,
+            )
             self.assertIn("/Query", run.call_args_list[1].args[0])
 
     def test_client_machine_selects_exact_cnpj_and_id(self):
