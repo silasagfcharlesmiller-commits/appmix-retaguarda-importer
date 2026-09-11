@@ -17,6 +17,7 @@ DisableReadyPage=yes
 DisableFinishedPage=yes
 Uninstallable=no
 PrivilegesRequired=admin
+MinVersion=10.0.14393
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
@@ -39,5 +40,36 @@ Source: "{#SourceDir}\monitor_mix.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\run_silent.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\integrador_version.json"; DestDir: "{app}"; Flags: ignoreversion
 
-[Run]
-Filename: "{app}\.mix-installer\Instalador-Mix-Fiscal-App.exe"; Parameters: "--install-dir ""{app}"""; WorkingDir: "{app}"; Flags: nowait skipifsilent
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+  Parameters: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    Parameters := '--install-dir "' + ExpandConstant('{app}') + '"';
+    if not Exec(
+      ExpandConstant('{app}\.mix-installer\MixFiscal-Bootstrap.exe'),
+      Parameters,
+      ExpandConstant('{app}'),
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    ) then
+      RaiseException('O bootstrap do WebView2 não pôde ser iniciado.');
+    if ResultCode <> 0 then
+      RaiseException('O WebView2 não ficou pronto. Consulte os diagnósticos da instalação.');
+
+    if not WizardSilent then
+      if not Exec(
+        ExpandConstant('{app}\.mix-installer\Instalador-Mix-Fiscal-App.exe'),
+        Parameters,
+        ExpandConstant('{app}'),
+        SW_SHOWNORMAL,
+        ewNoWait,
+        ResultCode
+      ) then
+        RaiseException('A interface do Instalador Mix Fiscal não pôde ser iniciada.');
+  end;
+end;

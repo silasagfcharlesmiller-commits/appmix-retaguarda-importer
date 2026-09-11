@@ -25,19 +25,29 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(expression.endswith("})()"))
         self.assertNotIn("}})()", expression)
 
-    def test_packaging_avoids_onefile_playwright_and_node(self):
+    def test_packaging_builds_native_go_wails_without_legacy_runtime(self):
         root = Path(__file__).parent
         generator = (root / "GERAR_INSTALADOR.ps1").read_text(encoding="utf-8-sig")
-        requirements = (root / "requirements-instalador.txt").read_text(encoding="utf-8-sig")
-        automation = (root / "automacao_primeiro_acesso.py").read_text(encoding="utf-8-sig")
-        self.assertIn("--onedir", generator)
+        verifier = (root / "verificar_pacote.py").read_text(encoding="utf-8-sig")
+        automation = (root / "go-installer/internal/installer/automation.go").read_text(encoding="utf-8-sig")
+        self.assertIn("go build", generator)
+        self.assertIn("MixFiscal-Bootstrap.exe", generator)
+        self.assertIn("Instalador-Mix-Fiscal-App.exe", generator)
         self.assertIn("Inno Setup", generator)
+        self.assertNotIn("PyInstaller", generator)
         self.assertNotIn("--onefile", generator)
         self.assertNotIn("--collect-all playwright", generator)
-        self.assertIn("websocket-client", requirements)
-        self.assertNotIn("playwright", requirements.casefold())
-        self.assertIn("CdpPage", automation)
+        self.assertIn("sem Python/PyQt/Playwright/Node", verifier)
+        self.assertIn("automateUI", automation)
         self.assertNotIn("sync_playwright", automation)
+
+    def test_setup_bootstraps_webview_before_opening_wails(self):
+        setup = (Path(__file__).parent / "Instalador-Mix-Fiscal.iss").read_text(encoding="utf-8-sig")
+        bootstrap = setup.index("MixFiscal-Bootstrap.exe")
+        interface = setup.index("Instalador-Mix-Fiscal-App.exe")
+        self.assertLess(bootstrap, interface)
+        self.assertIn("ewWaitUntilTerminated", setup)
+        self.assertIn("MinVersion=10.0.14393", setup)
 
     def test_gui_blocks_install_until_environment_is_ready(self):
         gui = (Path(__file__).parent / "instalador_gui.py").read_text(encoding="utf-8-sig")

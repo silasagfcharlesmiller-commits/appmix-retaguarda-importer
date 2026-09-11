@@ -3,6 +3,8 @@
 __pycache__/
 build/
 dist/
+!go-installer/frontend/dist/
+!go-installer/frontend/dist/**
 entrega/
 *.spec
 backup_instalador/

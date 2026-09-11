@@ -1,417 +1,65 @@
 # Arquitetura do Instalador do Integrador Mix Fiscal
 
-Este documento é a referência técnica central do instalador. Ele foi atualizado em
-**2026-09-10** a partir da branch `integrador-v1.1-diagnostico`, versão candidata `1.1.2`.
+Referência técnica atualizada em **2026-09-10** para a branch
+`integrador-v1.2-go-wails`, candidata `1.2.0`. Antes de gerar ou publicar, leia também
+[`PUBLICACAO.md`](PUBLICACAO.md) e confirme o branch e o `git status`.
 
-Antes de alterar, gerar ou publicar o instalador, leia também [`PUBLICACAO.md`](PUBLICACAO.md).
-Uma conversa nova deve conferir o branch, o commit e os manifestos antes de assumir que a
-situação registrada aqui continua atual.
+## Decisão de tecnologia
 
-## Estado do Git nesta revisão
+O instalador interno usa **Go 1.26 + Wails 2 + HTML/CSS/JavaScript puro**. Essa escolha acompanha
+o próprio `desktop-integrador.exe`, que também foi identificado estaticamente como Go/Wails, mantém
+a interface WebView2 e permite portar a automação CDP sem Playwright.
 
-| Item | Valor nesta revisão |
+O pacote entregue ao cliente não contém Python, PyQt, PyInstaller, Node, Playwright ou .NET. O
+frontend é incorporado aos executáveis Go durante o build. Os arquivos Python da geração anterior
+permanecem no repositório como referência e testes de regressão, mas não são empacotados na versão
+`1.2`.
+
+```text
+Instalador-Mix-Fiscal.exe (Inno Setup, elevado)
+  -> copia componentes para a pasta do próprio setup
+  -> MixFiscal-Bootstrap.exe (Go puro, sem WebView)
+       -> detecta/instala/confirma WebView2
+  -> Instalador-Mix-Fiscal-App.exe (Go + Wails)
+       -> interface HTML/CSS/JavaScript
+       -> diagnóstico Windows e atualização do setup
+       -> API Mix + automação CDP/WebSocket
+  -> desktop-integrador.exe (Integrador oficial Mix)
+  -> Painel_Mix.bat + monitor_mix.ps1 + run_silent.vbs
+```
+
+O bootstrap existe porque a janela Wails depende do WebView2 para abrir. Ele prepara o Runtime
+antes de o Inno iniciar a interface.
+
+## Compatibilidade de sistema
+
+O pacote é `windows/amd64`, `GOAMD64=v1`. O Inno declara `MinVersion=10.0.14393` e arquitetura x64.
+
+| Sistema | Situação |
 | --- | --- |
-| Branch de desenvolvimento | `integrador-v1.1-diagnostico` |
-| Commit da branch | `d84d72b` |
-| Versão candidata | `1.1.2` |
-| Branch estável | `main` / `origin/main` |
-| Versão registrada na branch estável | `1.0.3` |
-| Publicação da candidata | Ainda não mesclada em `main` nesta revisão |
-
-Não publique a candidata por cópia manual. A publicação oficial acontece com uma versão SemVer
-superior, pelo script `integrador\PUBLICAR_ATUALIZACAO.ps1`, seguida de revisão e push de `main`.
-
-## Objetivo e comportamento esperado
-
-O setup instala o Integrador oficial da Mix Fiscal na pasta em que o próprio setup foi colocado,
-configura o cliente no WebView2, preserva o Machine ID da máquina, ativa o monitor do Windows e
-confirma pela API que o ID usado pelo robô ficou online.
-
-O banco de dados e as configurações específicas de retaguarda continuam sendo enviados pelo App
-Mix/site. O setup cuida de CNPJ, arquivos locais, serviço `mixfiscal`, Machine ID, Integrador e
-monitor.
-
-## Sistemas operacionais
-
-O pacote atual é destinado a Windows de 64 bits.
-
-| Sistema | Situação recomendada |
-| --- | --- |
-| Windows 10 1809 ou superior, x64 | Compatível |
-| Windows 11, x64 | Compatível |
-| Windows Server 2019, 2022 e 2025, x64 | Compatível e recomendado para servidores |
-| Windows Server 2016 | WebView2 é suportado, mas exige teste real com o runtime PyQt6/Qt atual |
-| Windows 7, 8, 8.1, Server 2008, 2012 ou 2012 R2 | Não suportado pelo projeto |
-| Windows de 32 bits ou Windows ARM | Não suportado pelo pacote atual |
-
-O limite da interface vem do PyQt6/Qt 6.11, cujo alvo Windows oficial começa no Windows 10 1809.
-O WebView2 admite Windows Server 2016 ou superior, mas isso isoladamente não garante toda a
-aplicação. O executável oficial `desktop-integrador.exe` também pode impor requisitos próprios.
-
-Referências dos fornecedores:
-
-- Qt 6.11: <https://doc.qt.io/qt-6/supported-platforms.html>
-- Microsoft WebView2: <https://learn.microsoft.com/pt-br/microsoft-edge/webview2/>
-
-O arquivo Inno Setup está configurado com `ArchitecturesAllowed=x64compatible` e instala no modo
-64 bits. Ainda não há `MinVersion` no script `.iss`; portanto, o setup não bloqueia sozinho todas
-as versões antigas do Windows. A tabela acima deve ser tratada como requisito operacional.
-
-### Comparação com o `desktop-integrador.exe` fornecido
-
-Análise estática realizada em 2026-09-10, sem executar o Integrador nem acessar o portal:
-
-| Propriedade | Valor encontrado |
-| --- | --- |
-| SHA-256 | `EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8` |
-| Arquitetura PE | `AMD64` / 64 bits |
-| Versão interna do Integrador | `v0.0.120` |
-| Linguagem/runtime | Go `1.26.4` |
-| Framework desktop | Wails `2.14.0` |
-| Interface | WebView2 |
-| Alvo da compilação | `windows/amd64`, `GOAMD64=v1` |
-| Cabeçalho PE | versão mínima declarada `6.1` |
-| Manifesto | declara famílias Windows 7, 8, 8.1 e 10 |
-
-O cabeçalho PE e o manifesto indicam que o Windows pode tentar carregar o arquivo em versões
-antigas, mas não comprovam suporte funcional. O limite mais forte vem do Go: versões Go 1.21 ou
-superiores têm como requisito oficial Windows 10 ou Windows Server 2016 ou superior. O Wails v2
-publica suporte para Windows 10/11 e exige WebView2. A Microsoft mantém o WebView2 em Windows 10 e
-em Windows Server 2016 ou superior.
-
-Com a evidência disponível, o patamar técnico do Integrador oficial é:
-
-```text
-Cliente: Windows 10/11, 64 bits
-Servidor: Windows Server 2016 ou superior, 64 bits, sujeito a validação da Mix/Wails
-```
-
-Não foi encontrada documentação pública da Mix Fiscal informando uma versão mínima própria. Por
-isso, Server 2016 deve ser tratado como compatibilidade técnica a testar, não como garantia formal
-do fornecedor.
-
-Comparação com a interface atual do nosso instalador:
-
-| Ambiente | Integrador oficial | Instalador atual em PyQt6 6.11 | Alinhamento |
-| --- | --- | --- | --- |
-| Windows 10 1809+ x64 | Dentro do patamar | Suportado | Alinhado |
-| Windows 11 x64 | Dentro do patamar | Suportado | Alinhado |
-| Server 2019/2022/2025 x64 | Tecnicamente compatível | Patamar adotado pelo projeto | Alinhado |
-| Server 2016 x64 | Tecnicamente compatível | Qt 6.11 não o lista como alvo | Diferença a corrigir/testar |
-| Windows 10 anterior ao 1809 | Go/WebView2 podem admitir parte dessas versões | Qt 6.11 não suporta | Diferença sem valor operacional atual |
-
-O PyQt6 é, portanto, a camada que pode reduzir o alcance no Server 2016. Fazer apenas downgrade do
-PyQt6 não resolve de forma limpa, pois a família Qt 6 mantém requisitos mais novos. Migrar para
-PyQt5 ampliaria o alcance, mas introduziria uma linha Qt antiga e com suporte encerrado.
-
-Há três caminhos possíveis:
-
-1. trocar somente PyQt6 por `tkinter/ttk`, mantendo o motor Python; é a menor alteração e acompanha
-   Windows 10/Server 2016, mas não remove Python/PyInstaller;
-2. portar interface e motor para C# com WPF, mantendo CDP/WebSocket; remove Python, mas acrescenta o
-   runtime .NET ao pacote ou como pré-requisito;
-3. portar interface e motor para **Go + Wails + HTML/CSS/JavaScript**, usando o mesmo conjunto de
-   tecnologias do Integrador oficial; este é o caminho recomendado para obter o mesmo patamar.
-
-Na terceira opção, o protocolo e o comportamento não mudam. Um cliente WebSocket em Go substitui
-`cdp_browser.py`; o cliente HTTP, JSON, SHA-256, Registro, WTS, processos e Agendador também passam
-para Go. O frontend Wails usa arquivos web incorporados ao EXE e pode reproduzir o visual Mix com
-cartões, cantos arredondados, ícones vetoriais, escala responsiva, rolagem, campo de senha com olho e
-progresso detalhado. Node pode ser usado somente durante o build se o frontend usar React/Vite; ele
-não acompanha o executável entregue. Também é possível usar HTML/CSS/JavaScript sem framework.
-
-O alvo sugerido é o mesmo observado no Integrador: `windows/amd64`, `GOAMD64=v1`, Go 1.26 e Wails
-v2. O instalador interno torna-se um EXE nativo Go, sem Python, PyQt6, PyInstaller, .NET ou extração
-de runtime no `%TEMP%`. Isso tende a reduzir a pasta interna e elimina a assinatura típica de pacote
-PyInstaller, embora a assinatura digital própria continue necessária para reputação no SmartScreen
-e em antivírus corporativos.
-
-Como uma janela Wails depende do WebView2 para abrir, a verificação do Runtime deve sair da atual
-interface Python e acontecer antes dela, no Inno Setup ou em um pequeno bootstrap nativo Go sem
-interface WebView. O fluxo futuro recomendado é:
-
-```text
-Inno Setup elevado
-  -> verificar sistema, arquitetura e conta
-  -> detectar WebView2 no Registro
-  -> se ausente, baixar o bootstrapper Microsoft, validar assinatura, instalar e aguardar
-  -> abrir Instalador-Mix-Fiscal-App.exe em Go/Wails
-  -> executar diagnóstico, login, CNPJ, Machine ID, monitor e validação online
-```
-
-O `desktop-integrador.exe` analisado já foi compilado com a estratégia Wails
-`wv2runtime.download`. O nosso setup pode manter uma verificação mais rígida e silenciosa antes de
-abrir a tela, evitando depender da confirmação manual oferecida pelo Wails quando o Runtime falta.
-
-WinUI 3 não é indicado para este caso porque seu mínimo continua Windows 10 1809. Electron voltaria
-a incluir Node/Chromium no cliente. Tauri também dependeria de WebView2, mas introduziria Rust e um
-segundo ecossistema sem trazer vantagem sobre Wails. C++/Win32 seria menor, porém aumentaria o custo
-e o risco de manutenção.
-
-A migração completa deve ser feita em branch separada, mantendo esta versão Python utilizável até a
-paridade dos testes. Depois da migração, o Inno Setup deve declarar a versão mínima compatível com o
-Integrador oficial e o pacote deve ser validado em:
-
-- Windows 10 22H2;
-- Windows 11;
-- Windows Server 2016, 2019 e 2022;
-- uma máquina com WebView2 e outra sem WebView2;
-- uma sessão RDP administrativa e uma elevação com conta diferente.
-
-Até essa migração e esses testes acontecerem, o requisito recomendado deste instalador continua
-sendo Windows 10 1809+ ou Windows Server 2019+.
-
-## Arquitetura por camadas
-
-```text
-Instalador-Mix-Fiscal.exe
-  Inno Setup, elevado como administrador
-              |
-              v
-.mix-installer\Instalador-Mix-Fiscal-App.exe
-  Python 3.12 + PyQt6/Qt, empacotado por PyInstaller onedir
-              |
-              +--> diagnóstico do Windows, perfil, permissões e versões
-              +--> atualização do próprio setup
-              +--> instalação/validação do WebView2
-              +--> autenticação na API Mix
-              |
-              v
-desktop-integrador.exe
-  Aplicação oficial Mix Fiscal com WebView2/Wails
-              |
-              +--> automação local por CDP/WebSocket
-              +--> login, Machine ID, CNPJ, serviço, salvar e instalar
-              |
-              v
-Painel_Mix.bat + monitor_mix.ps1 + run_silent.vbs
-  tarefa agendada, monitor invisível e atualização automática
-```
-
-Não há Node.js nem Playwright no pacote `1.1`. A comunicação com a interface WebView2 usa o Chrome
-DevTools Protocol por WebSocket em `cdp_browser.py`.
-
-## Linguagens e ferramentas
-
-| Componente | Tecnologia | Função |
-| --- | --- | --- |
-| Setup externo | Inno Setup (`.iss`) | Elevação, cópia convencional e abertura da aplicação interna |
-| Interface interna | Python 3.12 + PyQt6/Qt 6.11 | Formulário, diagnóstico, versões e execução do fluxo |
-| Automação | Python | API, Machine ID, arquivos, WebView2 e validações |
-| Navegação local | Python + WebSocket/CDP | Controla a interface do Integrador sem Playwright |
-| Monitor/atualizador | PowerShell | Monitora, baixa, valida, troca e restaura componentes |
-| Painel manual | Batch | Instala, consulta, inicia, para e remove o monitor |
-| Lançador invisível | VBScript | Executa o monitor sem janela piscando |
-| Empacotamento Python | PyInstaller `onedir` | Inclui Python e PyQt6 sem exigir instalação no cliente |
-| Pacote final | Inno Setup 6 | Compacta o runtime e os arquivos em um único EXE de entrega |
-
-## Os dois executáveis do setup
-
-### 1. `Instalador-Mix-Fiscal.exe`
-
-É o arquivo entregue ao cliente. O Inno Setup:
-
-1. solicita elevação administrativa por `PrivilegesRequired=admin`;
-2. usa como destino a pasta em que o setup está (`DefaultDirName={src}`);
-3. copia o runtime interno para `.mix-installer`;
-4. copia `desktop-integrador.exe`, `Painel_Mix.bat`, `atualizador_mix.ps1`,
-   `monitor_mix.ps1`, `run_silent.vbs` e `integrador_version.json`;
-5. abre `.mix-installer\Instalador-Mix-Fiscal-App.exe --install-dir "<pasta>"`.
-
-Como o diagnóstico detalhado roda na aplicação interna, o Inno pode já ter copiado os arquivos
-antes de uma reprovação de perfil. Uma reprovação impede login, Machine ID e configuração do
-cliente, mas pode deixar os arquivos descompactados na pasta escolhida.
-
-### 2. `.mix-installer\Instalador-Mix-Fiscal-App.exe`
-
-É a tela profissional com CNPJ, usuário, senha, olho para exibir a senha, versões, diagnóstico e
-progresso. Ela é Python/PyQt6 compilado. Não exige Python, PyQt6, Node.js nem Playwright instalados
-na máquina do cliente.
-
-Ao iniciar, consulta o manifesto público. Se houver setup superior e o manifesto possuir a seção
-`installer`, baixa por HTTPS, valida host, tamanho, SHA-256 e cabeçalho PE, abre a versão nova com o
-mesmo destino e encerra a antiga. Se a consulta falhar, registra o problema e permite continuar com
-o setup local.
-
-Depois de mostrar a janela, faz automaticamente a verificação do ambiente. O botão de instalação
-só é habilitado quando essa verificação termina com sucesso.
-
-## Privilégios, conta e perfil do Windows
-
-O setup não tenta contornar UAC, antivírus ou política da empresa. Ele verifica cedo se o ambiente
-consegue executar o fluxo completo.
-
-O pré-diagnóstico exige:
-
-1. processo elevado como administrador;
-2. identificação da conta interativa da sessão RDP/console;
-3. conta elevada igual à conta interativa;
-4. leitura, criação, gravação, renomeação e remoção nos diretórios necessários;
-5. serviço `Schedule` do Agendador de Tarefas em execução;
-6. criação e remoção de uma tarefa temporária inofensiva com token interativo e nível mais alto.
-
-Exemplos:
-
-| Sessão ativa | Conta elevada | Resultado |
-| --- | --- | --- |
-| `SERVIDOR\ROBO` | `SERVIDOR\ROBO` | Liberado |
-| Administrador já conectado, UAC apenas com Sim/Não | Mesma conta | Liberado |
-| `SERVIDOR\CLIENTE` | `SERVIDOR\TI-ADMIN` informado no UAC | Bloqueado |
-
-O bloqueio por contas diferentes evita instalar os arquivos com um administrador e depois tentar
-usar WebView2, AppData e monitor no perfil de outro usuário.
-
-Os caminhos testados são:
-
-```text
-<pasta do instalador>
-%TEMP%
-%APPDATA%\mixfiscal-integrador
-%APPDATA%\desktop-integrador.exe\EBWebView
-%LOCALAPPDATA%\MixFiscal\Installer
-```
-
-Por exemplo, no perfil `Hom`, o perfil WebView2 testado é:
-
-```text
-C:\Users\Hom\AppData\Roaming\desktop-integrador.exe\EBWebView
-```
-
-Se a pasta ainda não existir, o teste tenta criá-la. Se qualquer teste falhar, a aplicação interna
-mantém o botão de instalação desabilitado e não inicia autenticação, alteração de Machine ID ou
-configuração do CNPJ.
-
-Em servidor RDP, o técnico deve entrar com a conta que ficará executando o Integrador e elevar o
-setup dentro dessa mesma sessão. Digitar no UAC a senha de outra conta administrativa é tratado como
-perfil incorreto. Desconectar o RDP geralmente preserva a sessão; fazer logoff encerra o token
-interativo usado por aplicações visíveis.
-
-## Execução permanente como administrador
-
-Depois de copiar e conferir `desktop-integrador.exe`, o instalador grava `RUNASADMIN` para o caminho
-exato do arquivo em:
-
-```text
-HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers
-```
-
-Em seguida lê novamente o valor e falha se não conseguir confirmá-lo. O atualizador repete essa
-configuração quando troca o executável. Isso faz o Windows solicitar/usar elevação nas futuras
-aberturas, conforme as políticas de UAC da máquina.
-
-O Integrador visível não deve ser executado como `SYSTEM` na sessão 0. O WebView2 e os arquivos de
-perfil pertencem à sessão interativa do usuário validado.
-
-## Senhas e autenticação
-
-Existem dois tipos diferentes de senha no ambiente:
-
-1. **credencial do Windows/UAC:** tratada exclusivamente pelo Windows; o instalador não captura,
-   transmite nem salva essa senha;
-2. **usuário e senha do Integrador Mix:** digitados no formulário PyQt6 e usados em memória durante
-   a instalação para validar a API e preencher a interface WebView2.
-
-A senha do Integrador:
-
-- aparece mascarada por padrão;
-- pode ser exibida temporariamente pelo botão de olho;
-- é reaproveitada quando a própria tela de Configurações pede o segundo login;
-- não é escrita nos JSONs ou logs;
-- é apagada do campo ao concluir ou falhar.
-
-O painel e a tarefa do monitor não recebem `/RU` nem `/RP` e não armazenam senha do Windows. A tarefa
-é criada com `/IT /RL HIGHEST`, usando o token interativo da conta que o pré-diagnóstico validou.
-
-## Verificação e instalação do WebView2
-
-O instalador pesquisa a versão `pv` do WebView2 Runtime nos registros de máquina e de usuário, nas
-visões de 32 e 64 bits, e escolhe a maior versão encontrada.
-
-Quando encontra o Runtime, registra e continua. Quando não encontra:
-
-1. cria `<pasta>\.setup`;
-2. baixa o bootstrapper Evergreen oficial da Microsoft;
-3. exige HTTPS e aplica timeout de download;
-4. confere tamanho mínimo e cabeçalho de executável;
-5. valida a assinatura Authenticode e exige a Microsoft como signatária;
-6. executa `MicrosoftEdgeWebview2Setup.exe /silent /install` sem janela;
-7. aguarda até dez minutos;
-8. aceita os códigos `0` ou `3010`;
-9. consulta novamente o Registro e só continua se encontrar uma versão instalada.
-
-Falhas de proxy, firewall, assinatura, instalação ou detecção interrompem o fluxo com mensagem e
-diagnóstico. A instalação do WebView2 acontece antes do login e da cópia/configuração interna feita
-pela automação Python.
-
-## Fluxo completo da instalação
-
-```text
-Abrir setup
-  -> elevar como administrador
-  -> copiar runtime/componentes pelo Inno
-  -> verificar atualização do próprio setup
-  -> abrir interface PyQt6
-  -> comparar conta interativa e elevada
-  -> testar AppData, LocalAppData, TEMP e pasta final
-  -> testar Agendador de Tarefas
-  -> validar CNPJ e presença de usuário/senha
-  -> detectar ou instalar WebView2
-  -> autenticar na API Mix
-  -> localizar Machine ID local existente
-  -> copiar e validar componentes por SHA-256
-  -> marcar desktop-integrador.exe como RUNASADMIN
-  -> habilitar temporariamente a porta CDP do WebView2
-  -> abrir desktop-integrador.exe
-  -> fazer login quando a tela solicitar
-  -> reutilizar o Machine ID nativo existente
-  -> gerar uma única vez somente quando realmente não existir ID
-  -> persistir o ID antes dos cliques seguintes
-  -> abrir Configurações e refazer login quando solicitado
-  -> preencher CNPJ
-  -> adicionar o serviço mixfiscal se ainda não estiver selecionado
-  -> rolar até o final
-  -> clicar Salvar Configurações e conferir localStorage
-  -> clicar Instalar e confirmar a instalação nativa
-  -> remover a configuração temporária de CDP
-  -> instalar e consultar o monitor pelo Painel Mix
-  -> confirmar CNPJ, serviço e Machine ID pela API
-  -> conferir o mesmo ID nos dois arquivos locais
-  -> aguardar o ID exato ficar online no App Mix
-  -> reabrir e validar o processo do Integrador
-  -> finalizar e mostrar o Machine ID
-```
-
-## Machine ID e idempotência
-
-As duas fontes locais são:
-
-```text
-<pasta>\config\machine_id.json
-%APPDATA%\mixfiscal-integrador\local_settings.json
-```
-
-Regras:
-
-- um ID existente é reutilizado;
-- ao gerar um ID novo, a automação usa o valor criado pela própria interface do Integrador;
-- o valor é persistido antes de continuar, permitindo retomar uma tentativa interrompida;
-- se os dois arquivos contiverem IDs diferentes, os dois são preservados e o setup para;
-- IDs adicionais vinculados ao mesmo CNPJ não são removidos, pois um pode atender XML e outro o
-  robô;
-- a validação final acompanha somente o Machine ID exato usado pela instalação atual.
-
-## Pasta de instalação
-
-O usuário deve criar a pasta definitiva, por exemplo:
+| Windows 10 x64, build 14393 ou superior | Aceito pelo setup; validar preferencialmente em 22H2 |
+| Windows 11 x64 | Compatível |
+| Windows Server 2016/2019/2022/2025 x64 | Mesmo patamar técnico do Integrador oficial; exige sessão interativa |
+| Windows 7/8/8.1 e Server 2012 R2 ou anterior | Bloqueado/não suportado |
+| Windows 32 bits ou ARM | Não suportado pelo pacote atual |
+
+O Integrador oficial analisado é AMD64, Go `1.26.4`, Wails `2.14.0`, versão interna `v0.0.120` e
+usa WebView2. O requisito prático vem do Go moderno: Windows 10 ou Server 2016 em diante. A
+compatibilidade funcional final sempre depende também do executável que a Mix fornecer.
+
+## Pasta de destino
+
+O usuário cria a pasta definitiva, por exemplo:
 
 ```text
 C:\Mix Fiscal\integrador
 ```
 
-e colocar `Instalador-Mix-Fiscal.exe` nela. O setup utiliza a própria pasta como destino. Ele não
-cria outra árvore `C:\Mix Fiscal\...` quando foi executado de uma pasta diferente.
+e coloca `Instalador-Mix-Fiscal.exe` nela. O Inno usa `{src}` como destino. Ele não cria outra pasta
+`Mix Fiscal` e não depende do nome exato da pasta. A atualização do próprio setup preserva esse
+destino por `--install-dir`/`/DIR=`.
 
-Componentes finais principais:
+Arquivos instalados:
 
 ```text
 desktop-integrador.exe
@@ -420,75 +68,142 @@ atualizador_mix.ps1
 monitor_mix.ps1
 run_silent.vbs
 integrador_version.json
-.mix-installer\...
+.mix-installer\Instalador-Mix-Fiscal-App.exe
+.mix-installer\MixFiscal-Bootstrap.exe
+.mix-installer\payload_manifest.json
 config\machine_id.json
 logs\instalacao.log
 logs\diagnostico.json
 ```
 
-## Monitor, Painel Mix e manutenção
+## Privilégios, conta e perfil
 
-O instalador chama:
+O Inno solicita administrador por `PrivilegesRequired=admin`. O diagnóstico Go só libera a
+automação quando:
+
+1. o processo está elevado;
+2. a conta elevada é a mesma conta da sessão RDP/console;
+3. a conta consegue criar, ler, gravar, renomear e remover arquivos na pasta final, `%TEMP%`,
+   `%APPDATA%\mixfiscal-integrador`, `%APPDATA%\desktop-integrador.exe\EBWebView` e
+   `%LOCALAPPDATA%\MixFiscal\Installer`;
+4. o serviço `Schedule` está ativo;
+5. uma tarefa temporária `/IT /RL HIGHEST` pode ser criada e removida sem `/RU` ou `/RP`.
+
+Se o técnico digitar no UAC a senha de outra conta administrativa, o fluxo para antes do login no
+Integrador. Isso evita criar o WebView2 e o Machine ID no perfil errado. O instalador não contorna
+UAC, política de domínio ou proteção corporativa.
+
+Depois de validar os componentes, grava `RUNASADMIN` para o caminho exato do
+`desktop-integrador.exe` em:
 
 ```text
-Painel_Mix.bat --install-monitor
+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers
 ```
 
-O BAT cria a tarefa `Mix Fiscal - Monitorar Integrador`, executada de forma invisível por
-`wscript.exe`/`run_silent.vbs`. Após a criação, o instalador consulta a tarefa e falha se ela não
-existir.
+O atualizador reaplica essa marca quando troca o executável.
+
+## Senhas
+
+- A senha do Windows/UAC é tratada somente pelo Windows.
+- Usuário e senha Mix são digitados na interface, usados em memória para API e para os formulários
+  do WebView2 e não são gravados em JSON ou log.
+- O campo de senha começa mascarado, possui botão de olho e é limpo ao terminar ou falhar.
+- A mesma credencial Mix atende o login inicial e a confirmação em Configurações, quando exigida.
+
+## WebView2
+
+O bootstrap consulta a versão `pv` do Runtime nas chaves HKLM/HKCU de 32 e 64 bits. Se não houver
+Runtime:
+
+1. baixa o Evergreen Bootstrapper pelo endereço oficial Microsoft;
+2. exige HTTP bem-sucedido, tamanho mínimo e cabeçalho PE;
+3. valida Authenticode e exige signatário Microsoft;
+4. executa `/silent /install` sem janela;
+5. aguarda até dez minutos e aceita sucesso ou reinicialização necessária (`3010`);
+6. consulta o Registro novamente e só retorna sucesso com uma versão encontrada.
+
+Falhas de proxy, firewall, assinatura ou instalação interrompem o Inno antes da tela Wails.
+
+## Fluxo da automação
+
+```text
+abrir setup e elevar
+  -> copiar arquivos e manifesto
+  -> preparar WebView2 no bootstrap
+  -> abrir interface Wails e consultar atualização do setup
+  -> validar conta, perfil e Agendador
+  -> validar CNPJ e credencial Mix
+  -> autenticar na API Mix
+  -> ler Machine ID local existente
+  -> conferir todos os componentes por tamanho e SHA-256
+  -> marcar o Integrador como RUNASADMIN
+  -> habilitar CDP local temporariamente na porta 19327
+  -> abrir desktop-integrador.exe
+  -> fazer login inicial quando a tela pedir
+  -> reutilizar o Machine ID do Integrador
+  -> gerar uma vez somente quando nenhum ID existir
+  -> persistir o ID imediatamente
+  -> buscar/configurar o ID legado quando essa tela aparecer
+  -> abrir Configurações e confirmar o login quando solicitado
+  -> preencher CNPJ
+  -> adicionar o serviço mixfiscal se estiver ausente
+  -> clicar Salvar Configurações e confirmar o localStorage
+  -> clicar Instalar; se estiver parado, clicar Iniciar
+  -> remover a configuração temporária de CDP
+  -> chamar Painel_Mix.bat --install-monitor e consultar a tarefa
+  -> confirmar CNPJ, serviço e Machine ID exato pela API
+  -> conferir o mesmo ID nos dois arquivos locais
+  -> esperar o ID exato ficar online
+  -> reabrir o Integrador e confirmar que o processo permaneceu ativo
+```
+
+A automação usa Chrome DevTools Protocol diretamente por WebSocket em
+`go-installer/internal/installer/cdp.go`. A porta é ligada no Registro apenas durante o fluxo e o
+valor anterior é restaurado no `defer`, inclusive em falha.
+
+## Machine ID e idempotência
+
+Fontes locais:
+
+```text
+<pasta>\config\machine_id.json
+%APPDATA%\mixfiscal-integrador\local_settings.json
+```
+
+Um ID existente é reutilizado. Quando não existe ID, a automação clica uma vez em **Iniciar nova
+configuração** e lê o valor criado pela interface; ela não chama o gerador uma segunda vez. O ID é
+gravado antes dos demais cliques para uma nova tentativa retomar a mesma identidade.
+
+Se os dois arquivos tiverem IDs diferentes, ambos são preservados e a instalação para. Outros IDs
+do mesmo CNPJ são aceitos porque XML e robô podem usar identidades distintas. A confirmação final
+acompanha apenas o ID usado nesta instalação.
+
+## Monitor e manutenção
+
+O Go chama `Painel_Mix.bat --install-monitor` e depois consulta a tarefa
+`Mix Fiscal - Monitorar Integrador`. O BAT usa `wscript.exe`/`run_silent.vbs`, sem janela piscando.
 
 No painel manual:
 
 - opção 2 instala ou reativa o monitor e as tarefas nativas;
 - opção 3 inicia o Integrador;
 - opção 4 para o Integrador;
-- opção 5 desinstala/desativa o monitor e desativa `BootStart`, `Startup` e `Watchdog` para
-  manutenção.
+- opção 5 remove/desativa o monitor e desativa `BootStart`, `Startup` e `Watchdog`.
 
-O monitor procura primeiro `desktop-integrador.exe`, depois um EXE com `integrador` no nome e, se
-houver apenas um EXE de aplicação na pasta, pode usar esse arquivo. Ele roda a cada cinco minutos.
+O monitor roda a cada cinco minutos, mantém o Integrador ativo e chama o atualizador.
 
-## Atualização automática
+## Atualizações
 
-Há dois ciclos diferentes.
+`atualizador_mix.ps1` baixa e repara `desktop-integrador.exe`, `Painel_Mix.bat`,
+`monitor_mix.ps1`, `run_silent.vbs` e ele próprio. Cada arquivo exige HTTPS no host autorizado,
+tamanho e SHA-256. A troca usa backup e restauração.
 
-### Componentes já instalados
+A interface Go também consulta a seção `installer` do manifesto. Se houver versão superior, baixa
+o novo setup, valida host, tamanho, SHA-256 e cabeçalho PE, abre-o com a mesma pasta de destino e
+encerra a interface anterior. Setups anteriores a `1.1.0` precisam ser trocados manualmente uma
+última vez.
 
-O monitor executa `atualizador_mix.ps1` a cada ciclo. O atualizador consulta:
-
-```text
-https://appmix-retaguarda-importer.vercel.app/integrador-updates/version.json
-```
-
-Ele pode atualizar:
-
-- `desktop-integrador.exe`;
-- `Painel_Mix.bat`;
-- `monitor_mix.ps1`;
-- `run_silent.vbs`;
-- `atualizador_mix.ps1`.
-
-Cada download exige HTTPS no host autorizado, tamanho e SHA-256 compatíveis. Executáveis também
-passam pela verificação de cabeçalho. A troca cria backups e restaura os arquivos se falhar. Mesmo
-com a mesma versão, o atualizador pode reparar componente ausente ou alterado.
-
-Esse ciclo não chama o pré-diagnóstico completo de conta da instalação inicial. Portanto, uma
-máquina já instalada continua verificando componentes; erros ficam no log de atualização.
-
-### Atualização do próprio instalador
-
-Setups a partir da geração `1.1` consultam a seção `installer` do mesmo manifesto ao abrir. Se a
-versão publicada for superior, baixam e validam o novo setup antes de abri-lo. Versões antigas que
-não possuem esse recurso precisam receber manualmente um setup novo uma última vez.
-
-Mudanças somente no código interno do setup exigem publicação de um novo
-`Instalador-Mix-Fiscal.exe`. Atualizar apenas os cinco componentes não substitui automaticamente a
-aplicação interna `.mix-installer` já copiada.
-
-## Logs, antivírus e suporte
-
-Os relatórios principais ficam em:
+## Logs e antivírus
 
 ```text
 <pasta>\logs\instalacao.log
@@ -498,87 +213,54 @@ Os relatórios principais ficam em:
 <pasta>\painel_install_log.txt
 ```
 
-O diagnóstico registra sistema, contas, sessão, permissões, versões, etapas e ocorrências
-relacionadas encontradas no Microsoft Defender. Não registra credenciais e não desativa Defender,
-antivírus, EDR, firewall, UAC ou políticas da TI.
+Os diagnósticos não registram credenciais. Em erro, consultam ocorrências relacionadas do Microsoft
+Defender para informar a TI. O runtime Go/Wails evita a extração temporária e os padrões do
+PyInstaller que causaram bloqueio anterior. O pacote ainda precisa de certificado de assinatura de
+código da Mix para ganhar reputação consistente no SmartScreen e em antivírus corporativos.
 
-O pacote atual ainda não possui assinatura digital própria. Mesmo sem Playwright/Node e mesmo que
-uma verificação local não encontre ameaça, SmartScreen ou um antivírus corporativo pode bloquear o
-EXE por reputação ou política. A solução correta para distribuição ampla é assinatura de código da
-Mix Fiscal e, quando necessário, liberação pela TI do cliente.
+## Código e build
 
-## Arquivos-fonte centrais
-
-| Arquivo | Responsabilidade |
+| Caminho | Responsabilidade |
 | --- | --- |
-| `Instalador-Mix-Fiscal.iss` | Setup Inno, elevação, destino, cópia e abertura da interface |
-| `instalador_gui.py` | Janela PyQt6, senha, versões, botão e threads |
-| `diagnostico_instalador.py` | Conta, perfil, WebView2, versões, atualização do setup, admin e logs |
-| `automacao_primeiro_acesso.py` | Orquestra instalação, WebView2, CNPJ, Machine ID e monitor |
-| `cdp_browser.py` | Cliente CDP/WebSocket para a interface WebView2 |
-| `instalador_core.py` | CNPJ, JSON atômico, API e confirmação online |
-| `Painel_Mix.bat` | Painel manual e criação da tarefa do monitor |
-| `monitor_mix.ps1` | Mantém o processo ativo e chama o atualizador |
-| `atualizador_mix.ps1` | Download, integridade, backup, troca e restauração |
-| `run_silent.vbs` | Execução invisível do monitor |
-| `GERAR_INSTALADOR.ps1` | PyInstaller `onedir`, Inno Setup e verificação do pacote |
-| `PUBLICAR_ATUALIZACAO.ps1` | Versão, manifestos, binários públicos e setup final |
-| `verificar_pacote.py` | Auditoria estrutural do pacote gerado |
-| `test_instalador.py` | Testes isolados do instalador |
+| `go-installer/cmd/bootstrap` | verificação/instalação prévia do WebView2 |
+| `go-installer/cmd/ui` | janela Wails |
+| `go-installer/frontend/dist` | HTML, CSS, JavaScript e SVG incorporados |
+| `go-installer/internal/installer/app.go` | métodos ligados à interface |
+| `automation.go` | sequência de instalação, ID, Configurações e monitor |
+| `cdp.go` | cliente WebSocket/CDP |
+| `core.go` | CNPJ, API, JSON, SHA-256 e versões |
+| `windows.go` | WTS, UAC, Registro, WebView2, Agendador e processos |
+| `diagnostics.go` / `report.go` | logs, pré-diagnóstico e versões |
+| `update.go` | atualização do próprio setup |
+| `Instalador-Mix-Fiscal.iss` | elevação, destino, cópia, bootstrap e abertura |
+| `GERAR_INSTALADOR.ps1` | testes Go, dois builds nativos, Inno e auditoria |
+| `PUBLICAR_ATUALIZACAO.ps1` | versão, manifestos e artefatos públicos |
 
-## Geração e publicação
-
-O comando canônico, executado na raiz do repositório, é:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\PUBLICAR_ATUALIZACAO.ps1 `
-  -Versao 1.1.3 `
-  -Executavel "C:\caminho\desktop-integrador.exe"
-```
-
-O número acima é apenas exemplo: consulte os dois manifestos e sempre use uma versão maior que a
-já publicada. Não copie executáveis nem edite manifestos manualmente.
+O build usa o Go instalado ou o pacote portátil em
+`integrador\.tools\go1.26.4\go\bin\go.exe`. `.tools` e caches são locais e ignorados pelo Git.
+O frontend não exige `npm`.
 
 Validação mínima:
 
 ```powershell
-python -m py_compile integrador\instalador_core.py integrador\cdp_browser.py `
-  integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py `
-  integrador\instalador_gui.py
-
-python -m unittest discover -s integrador -p test_instalador.py
-
-Push-Location web
-npm.cmd run build
+$go = '.\integrador\.tools\go1.26.4\go\bin\go.exe'
+Push-Location .\integrador\go-installer
+& $go test ./...
+& $go vet ./...
+node --check .\frontend\dist\app.js
 Pop-Location
+
+.\.venv\Scripts\python.exe -m unittest discover -s integrador -p test_instalador.py
+powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\GERAR_INSTALADOR.ps1 -SkipDependencies
 ```
 
-Antes de push em `main`, execute `git status --short -- web`, preserve alterações alheias e revise
-os binários públicos. O push de `main` aciona o deploy do projeto Vercel com raiz `web`. Nunca rode
-`vercel --prod` na raiz deste repositório.
+## Limites de validação
 
-## Restrições para uma nova conversa
+Os testes locais confirmam compilação, seletores, CNPJ, idempotência, conflito de IDs, escrita
+atômica, integridade do payload e estrutura do pacote. Eles não substituem o teste de ponta a ponta
+em uma máquina cliente autorizada. Antes de promover `1.2.0`, validar em Windows 10/11 e Server
+2016/2019/2022, com e sem WebView2, em RDP com a mesma conta elevada e com uma conta diferente para
+confirmar o bloqueio preventivo.
 
-Ao retomar este trabalho:
-
-1. leia este arquivo, `PUBLICACAO.md` e `STATUS_IMPLEMENTACAO.md`;
-2. execute `git branch --show-current` e `git status --short`;
-3. compare `integrador/integrador_version.json`, o manifesto em
-   `web/public/integrador-updates/version.json` e `origin/main`;
-4. preserve `integrador/config`, bancos locais, logs, perfis, tokens e dados de clientes;
-5. não execute o Integrador real, não autentique no portal e não altere CNPJ/Machine ID sem uma
-   autorização pontual que identifique o ambiente e o cliente;
-6. use apenas `PUBLICAR_ATUALIZACAO.ps1` para gerar uma publicação;
-7. não misture a branch candidata com `main` sem revisar o site inteiro e os artefatos públicos.
-
-## Limitações e validações pendentes
-
-- A candidata `1.1.2` precisa de teste completo em uma máquina cliente limpa.
-- Deve ser testada em uma máquina sem WebView2, confirmando download, assinatura, espera e segunda
-  detecção.
-- Windows Server 2016 requer teste específico; o requisito recomendado permanece Server 2019+.
-- O pré-diagnóstico interno acontece depois da cópia inicial do Inno.
-- A execução visível do WebView2 depende de uma sessão interativa conectada.
-- O pacote continua sujeito à política do antivírus enquanto não receber assinatura digital.
-- O código não contorna uma conta sem acesso ao AppData; ele detecta e explica o bloqueio antes de
-  autenticar e configurar o cliente.
+Não execute o Integrador real, login, API do portal ou alteração de Machine ID em uma nova conversa
+sem autorização pontual para o ambiente e CNPJ exatos.

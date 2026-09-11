@@ -2,12 +2,19 @@ param([switch]$SkipDependencies)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$python = Join-Path (Split-Path -Parent $root) '.venv\Scripts\python.exe'
+$project = Split-Path -Parent $root
+$python = Join-Path $project '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $python)) { $python = 'python' }
 
-if (-not $SkipDependencies) {
-    & $python -m pip install -r (Join-Path $root 'requirements-instalador.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Falha ao instalar dependencias do setup.' }
+$portableGo = Join-Path $root '.tools\go1.26.4\go\bin\go.exe'
+if (Test-Path -LiteralPath $portableGo -PathType Leaf) {
+    $go = $portableGo
+} else {
+    $goCommand = Get-Command go -ErrorAction SilentlyContinue
+    if (-not $goCommand) {
+        throw 'Go 1.26.4 nao encontrado. Instale o Go ou extraia o pacote oficial em integrador\.tools\go1.26.4.'
+    }
+    $go = $goCommand.Source
 }
 
 $versionData = Get-Content -LiteralPath (Join-Path $root 'integrador_version.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -19,6 +26,7 @@ $runtimeDist = Join-Path $buildRoot 'installer-runtime'
 $runtimeDir = Join-Path $runtimeDist 'Instalador-Mix-Fiscal-App'
 $payloadManifest = Join-Path $buildRoot 'payload_manifest.json'
 $installer = Join-Path $root 'entrega\Instalador-Mix-Fiscal.exe'
+$goProject = Join-Path $root 'go-installer'
 
 $resolvedRoot = [System.IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
 $resolvedRuntime = [System.IO.Path]::GetFullPath($runtimeDist)
@@ -28,7 +36,7 @@ if (-not $resolvedRuntime.StartsWith($resolvedRoot, [System.StringComparison]::O
 if (Test-Path -LiteralPath $runtimeDist) {
     Remove-Item -LiteralPath $runtimeDist -Recurse -Force
 }
-New-Item -ItemType Directory -Path $buildRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Split-Path -Parent $installer) -Force | Out-Null
 
 $componentNames = @(
@@ -51,24 +59,41 @@ foreach ($name in $componentNames) {
     ($payload | ConvertTo-Json -Depth 5),
     [System.Text.UTF8Encoding]::new($false)
 )
+Copy-Item -LiteralPath $payloadManifest -Destination (Join-Path $runtimeDir 'payload_manifest.json') -Force
 
-Write-Host 'Gerando aplicacao interna sem extracao onefile e sem Playwright/Node...'
-& $python -m PyInstaller `
-    --noconfirm `
-    --clean `
-    --onedir `
-    --windowed `
-    --uac-admin `
-    --name 'Instalador-Mix-Fiscal-App' `
-    --icon ((Join-Path $root 'desktop-integrador.exe') + ',0') `
-    --add-data ($payloadManifest + ';.') `
-    --add-data ((Join-Path $root 'integrador_version.json') + ';.') `
-    --paths $root `
-    --specpath $root `
-    --distpath $runtimeDist `
-    --workpath (Join-Path $buildRoot 'installer-runtime-work') `
-    (Join-Path $root 'instalador_gui.py')
-if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar a aplicacao interna do setup.' }
+$goCache = New-Item -ItemType Directory -Path (Join-Path $root '.tools\gocache') -Force
+$goModuleCache = New-Item -ItemType Directory -Path (Join-Path $root '.tools\gomodcache') -Force
+$previousGoCache = $env:GOCACHE
+$previousGoModuleCache = $env:GOMODCACHE
+$previousCGO = $env:CGO_ENABLED
+$env:GOCACHE = $goCache.FullName
+$env:GOMODCACHE = $goModuleCache.FullName
+$env:CGO_ENABLED = '0'
+
+Write-Host 'Gerando bootstrap e interface nativos em Go/Wails, sem Python, PyQt, Playwright ou Node...'
+Push-Location $goProject
+try {
+    if (-not $SkipDependencies) {
+        & $go mod download
+        if ($LASTEXITCODE -ne 0) { throw 'Falha ao baixar os modulos Go do instalador.' }
+    }
+    & $go test ./...
+    if ($LASTEXITCODE -ne 0) { throw 'Os testes Go do instalador falharam.' }
+
+    & $go build -buildvcs=false -trimpath -ldflags '-s -w -H windowsgui' `
+        -o (Join-Path $runtimeDir 'MixFiscal-Bootstrap.exe') .\cmd\bootstrap
+    if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar o bootstrap do WebView2.' }
+
+    $uiLdFlags = "-s -w -H windowsgui -X main.version=$version"
+    & $go build -buildvcs=false -tags 'desktop,production,wv2runtime.download' -trimpath `
+        -ldflags $uiLdFlags -o (Join-Path $runtimeDir 'Instalador-Mix-Fiscal-App.exe') .\cmd\ui
+    if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar a interface Go/Wails.' }
+} finally {
+    Pop-Location
+    $env:GOCACHE = $previousGoCache
+    $env:GOMODCACHE = $previousGoModuleCache
+    $env:CGO_ENABLED = $previousCGO
+}
 
 $isccCandidates = @(
     (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
@@ -96,4 +121,4 @@ if ($LASTEXITCODE -ne 0) {
     Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
     throw 'O pacote final nao passou na verificacao de integridade.'
 }
-Write-Host "Instalador convencional criado e validado em: $installer"
+Write-Host "Instalador Go/Wails criado e validado em: $installer"

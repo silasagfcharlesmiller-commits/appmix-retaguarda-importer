@@ -68,7 +68,7 @@ $localVersionJson = @{version = $Versao; channel = 'stable'} | ConvertTo-Json
     (Join-Path $root 'integrador_version.json'), $localVersionJson, $utf8NoBom
 )
 
-& (Join-Path $root 'GERAR_INSTALADOR.ps1') -SkipDependencies
+& (Join-Path $root 'GERAR_INSTALADOR.ps1')
 $installerSource = Join-Path $root 'entrega\Instalador-Mix-Fiscal.exe'
 $installerPublic = Join-Path $publicDownload 'Instalador-Mix-Fiscal.exe'
 Copy-Item -LiteralPath $installerSource -Destination $installerPublic -Force

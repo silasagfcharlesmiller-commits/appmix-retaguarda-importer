@@ -1,67 +1,83 @@
 # Publicação do Integrador Mix Fiscal
 
-Este é o roteiro canônico para atualizar o Integrador e publicar o instalador. Execute todos
-os comandos a partir da raiz:
+Este é o roteiro canônico. Execute os comandos na raiz:
 
 ```text
 C:\Users\Hom\Desktop\appmix
 ```
 
-## 1. Escolher a versão
+## 1. Conferir versão e branch
 
-Consulte `integrador/integrador_version.json` e
-`web/public/integrador-updates/version.json`. A nova versão precisa ser maior que a publicada,
-seguindo `MAJOR.MINOR.PATCH`. Os clientes só baixam quando a versão remota é superior à local.
-Nunca reutilize nem diminua uma versão já publicada.
+Leia `integrador/integrador_version.json` e
+`web/public/integrador-updates/version.json`. Use sempre SemVer superior à maior versão publicada.
+Não reutilize nem reduza versão.
 
-Exemplos: `1.0.0` → `1.0.1` para correção, `1.0.1` → `1.1.0` para funcionalidade.
+```powershell
+git branch --show-current
+git status --short
+Get-Content .\integrador\integrador_version.json
+Get-Content .\web\public\integrador-updates\version.json
+```
 
-## 2. Gerar todos os artefatos
+## 2. Pré-requisitos de build
 
-O build da geração `1.1` requer o Inno Setup 6. Se `ISCC.exe` não estiver disponível, instale-o
-uma vez com:
+- Inno Setup 6;
+- Go 1.26.4 instalado ou extraído em
+  `integrador\.tools\go1.26.4\go\bin\go.exe`;
+- Python somente para o verificador/testes do repositório;
+- Node não é usado pelo instalador nem por seu frontend.
+
+Para instalar o Inno uma vez:
 
 ```powershell
 winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
 ```
 
-Use este comando, trocando a versão e o caminho do novo executável:
+## 3. Gerar a versão
+
+Use somente `PUBLICAR_ATUALIZACAO.ps1`, trocando a versão e o executável oficial:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\PUBLICAR_ATUALIZACAO.ps1 `
-  -Versao 1.0.1 `
+  -Versao 1.2.0 `
   -Executavel "C:\caminho\desktop-integrador.exe"
 ```
 
-O script realiza em conjunto:
+O script:
 
-- copia o novo executável para `integrador/desktop-integrador.exe`;
-- publica a cópia baixada pelos clientes em
-  `web/public/integrador-updates/desktop-integrador.exe`;
-- gera `web/public/integrador-updates/version.json` sem BOM, com versão, tamanho e SHA-256;
-- atualiza `integrador/integrador_version.json`;
-- gera a aplicação interna em modo `onedir`, sem a autoextração `onefile` e sem Playwright/Node;
-- compila `integrador/entrega/Instalador-Mix-Fiscal.exe` como um setup convencional pelo Inno
-  Setup, com solicitação de administrador;
-- valida o runtime interno, o manifesto dos componentes, a ausência de Playwright/Node e o
-  cabeçalho do pacote final;
-- copia o instalador para `web/public/downloads/Instalador-Mix-Fiscal.exe`.
+- copia o Integrador oficial para a origem e a pasta pública;
+- atualiza `integrador_version.json` e o manifesto público sem BOM;
+- registra tamanho e SHA-256 dos cinco componentes atualizáveis;
+- executa testes Go;
+- compila `MixFiscal-Bootstrap.exe` e `Instalador-Mix-Fiscal-App.exe` nativos;
+- incorpora HTML/CSS/JavaScript na interface Wails;
+- gera o setup elevado pelo Inno;
+- audita payload e ausência de Python/PyQt/Playwright/Node no runtime;
+- copia o setup para `web/public/downloads/Instalador-Mix-Fiscal.exe`;
+- acrescenta ao manifesto o tamanho e SHA-256 do próprio setup.
 
-Não edite o manifesto ou copie esses arquivos manualmente.
+Não edite manifestos nem copie artefatos manualmente.
 
-## 3. Validar antes do commit
+## 4. Validar
 
 ```powershell
-python -m py_compile integrador\instalador_core.py integrador\cdp_browser.py integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
-Push-Location integrador
-python -m unittest test_instalador.py
+$go = '.\integrador\.tools\go1.26.4\go\bin\go.exe'
+$env:GOCACHE = (Resolve-Path '.\integrador\.tools\gocache').Path
+$env:GOMODCACHE = (Resolve-Path '.\integrador\.tools\gomodcache').Path
+Push-Location .\integrador\go-installer
+& $go test ./...
+& $go vet ./...
+node --check .\frontend\dist\app.js
 Pop-Location
-Push-Location web
+
+.\.venv\Scripts\python.exe -m unittest discover -s integrador -p test_instalador.py
+
+Push-Location .\web
 npm.cmd run build
 Pop-Location
 ```
 
-Confirme também que o SHA-256 do binário público coincide com o manifesto:
+Confirme o binário publicado contra o manifesto:
 
 ```powershell
 $manifesto = Get-Content .\web\public\integrador-updates\version.json -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -73,64 +89,57 @@ if ($hash -ne $manifesto.executable.sha256 -or $tamanho -ne $manifesto.executabl
 }
 ```
 
-## 4. Revisar, criar o commit e publicar
+## 5. Revisar e publicar
 
-Revise `git status` e adicione somente os arquivos da alteração. Mudanças do Integrador
-normalmente incluem o código alterado e estes artefatos:
-
-```text
-integrador/desktop-integrador.exe
-integrador/integrador_version.json
-web/public/integrador-updates/desktop-integrador.exe
-web/public/integrador-updates/version.json
-web/public/downloads/Instalador-Mix-Fiscal.exe
-```
-
-Antes do push, execute também:
+Antes de qualquer push em `main`:
 
 ```powershell
 git status --short -- web
 ```
 
-Todo push em `main` recompila o site completo. Se houver páginas ou rotas locais que já foram
-publicadas manualmente, mas ainda não estão no GitHub, um push somente do Integrador fará a
-Vercel voltar ao código antigo. Revise e versione primeiro a versão correta de `web`.
+Todo push em `main` recompila o site completo. Inclua as alterações corretas do site e confira que
+nenhuma versão local publicada anteriormente será revertida. Os artefatos esperados incluem:
 
-Depois do commit, execute:
+```text
+integrador/desktop-integrador.exe
+integrador/integrador_version.json
+integrador/entrega/Instalador-Mix-Fiscal.exe
+web/public/integrador-updates/desktop-integrador.exe
+web/public/integrador-updates/version.json
+web/public/downloads/Instalador-Mix-Fiscal.exe
+```
+
+Depois de revisar e mesclar a branch candidata em `main`:
 
 ```powershell
 git push origin main
 ```
 
-O push da branch `main` dispara o deploy de produção. O projeto Vercel é
-`appmix-retaguarda-importer` e a raiz da aplicação é `web`. Não execute `vercel --prod` na
-raiz do repositório: o `.vercelignore` local exclui `*.exe` e pode deixar os downloads fora.
+O push de `main` faz o deploy do projeto Vercel `appmix-retaguarda-importer`, cuja raiz é `web`.
+Nunca execute `vercel --prod` na raiz do repositório.
 
-## 5. Confirmar o deploy público
-
-Espere o deploy terminar e confira:
+## 6. Validar os downloads públicos
 
 - manifesto: <https://appmix-retaguarda-importer.vercel.app/integrador-updates/version.json>;
 - Integrador: <https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe>;
 - instalador: <https://appmix-retaguarda-importer.vercel.app/downloads/Instalador-Mix-Fiscal.exe>.
 
-Baixe o Integrador publicado e compare seu tamanho e SHA-256 com o manifesto. Verifique também
-se o instalador responde com HTTP `200` e o tamanho esperado.
+Confirme HTTP `200`, tamanho e SHA-256 após a Vercel terminar.
 
-## Alcance da atualização automática
+## Alcance das atualizações
 
-O monitor instalado verifica o manifesto a cada cinco minutos. A partir da versão `1.0.1`, ele
-atualiza automaticamente `desktop-integrador.exe`, `Painel_Mix.bat`, `monitor_mix.ps1`,
-`run_silent.vbs` e o próprio `atualizador_mix.ps1`. Cada componente é validado por origem HTTPS,
-tamanho e SHA-256. A troca usa backup e restaura os arquivos se uma etapa falhar.
+O monitor atualiza automaticamente, a cada cinco minutos:
 
-Máquinas que receberam uma versão anterior a `1.0.1` precisam executar o instalador novo uma
-vez para receber o atualizador completo. Depois dessa transição, novas versões desses cinco
-componentes chegam automaticamente. Mudanças na automação de instalação ou no próprio
-`Instalador-Mix-Fiscal.exe` continuam exigindo o novo instalador, pois ele não permanece na pasta
-instalada.
+- `desktop-integrador.exe`;
+- `Painel_Mix.bat`;
+- `monitor_mix.ps1`;
+- `run_silent.vbs`;
+- `atualizador_mix.ps1`.
 
-A partir da versão `1.1.0`, o manifesto também contém tamanho e SHA-256 do próprio instalador.
-Ao abrir, o setup consulta esse manifesto e, quando há uma versão superior, baixa, valida e abre
-o novo setup preservando a pasta original como destino. Uma versão anterior a `1.1.0` precisa
-ser substituída manualmente uma última vez para receber esse mecanismo.
+A interface Wails também atualiza o próprio setup ao ser aberta quando encontra versão remota
+superior. Ela baixa, valida e abre o novo `Instalador-Mix-Fiscal.exe` preservando a pasta original.
+Máquinas com setup anterior a `1.1.0` precisam receber manualmente um setup moderno uma última vez.
+
+Uma alteração somente no código do instalador Go/Wails exige nova versão do setup. O monitor não
+troca sozinho os binários dentro de `.mix-installer`; essa atualização acontece quando o usuário
+abre o setup e ele encontra a versão superior publicada.

@@ -1,95 +1,56 @@
 # Status da automação do Integrador
 
-Atualizado em 2026-09-10.
+Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 
-## Fluxo implementado
+## Candidata atual
 
-O instalador executa como administrador, copia o Integrador e o Painel Mix para a própria pasta
-onde o instalador foi colocado, autentica no WebView2, reutiliza a identidade nativa existente,
-configura CNPJ e Mix Fiscal, salva, instala as tarefas nativas, instala o monitor adicional e
-confirma pela API que o ID exato está online para o App Mix.
+- versão: `1.2.0`;
+- interface: Go 1.26 + Wails 2 + HTML/CSS/JavaScript;
+- pacote: Inno Setup elevado;
+- runtime cliente: dois executáveis Go e um manifesto;
+- automação: CDP/WebSocket direto, sem Playwright;
+- destino: a mesma pasta em que o setup foi colocado;
+- publicação: ainda depende de revisão/merge/push em `main`.
 
-A correção de idempotência removeu a limpeza automática do estado local. A ordem atual é:
+## Implementado
 
-1. ler o ID dos dois arquivos locais, quando existirem;
-2. abrir o Integrador e chamar `LoadSavedMachineID`;
-3. quando a tela inicial precisar gerar um ID, clicar uma vez e ler diretamente o valor de
-   `machine-generated-id-input`, sem chamar o gerador novamente;
-4. persistir imediatamente o valor retornado;
-5. abrir Configurações pelo menu e confirmar o segundo login;
-6. preencher CNPJ e Mix Fiscal, rolar ao final, salvar e instalar;
-7. instalar e consultar a tarefa adicional do monitor;
-8. validar `settings/details` e esperar o ID exato do robô ficar online.
+- bootstrap Go detecta, baixa, valida e instala WebView2 antes da interface;
+- tela responsiva com CNPJ, login, senha com olho, diagnóstico e versões;
+- atualização do próprio instalador ao abrir;
+- diagnóstico da conta interativa/elevada, AppData, TEMP e Agendador;
+- validação de payload por tamanho e SHA-256;
+- `desktop-integrador.exe` marcado como `RUNASADMIN`;
+- login inicial e segundo login em Configurações quando a tela pedir;
+- reaproveitamento idempotente do Machine ID existente;
+- geração única pela interface oficial quando nenhum ID existe;
+- preenchimento de CNPJ, serviço `mixfiscal`, Salvar e Instalar/Iniciar;
+- monitor instalado por `Painel_Mix.bat --install-monitor` e tarefa consultada;
+- confirmação de CNPJ, serviço e Machine ID exato na API e espera pelo status online;
+- logs sem credenciais e indicação de ocorrências relacionadas do Microsoft Defender;
+- atualização dos cinco componentes já instalados pelo monitor.
 
-Outros IDs do CNPJ são permitidos e preservados, porque uma identidade pode atender XML e
-outra pode atender o robô. A idempotência evita trocar o ID local do robô em uma nova tentativa.
+## Validações locais concluídas
 
-## Monitor
+- `go test ./...` passou;
+- `go vet ./...` passou;
+- JavaScript passou em `node --check`;
+- 27 testes Python de regressão passaram;
+- os dois executáveis Windows nativos foram compilados;
+- Inno Setup 6.7.3 gerou o pacote completo;
+- o verificador confirmou dois binários nativos e ausência de Python/PyQt/Playwright/Node;
+- a prévia do frontend foi renderizada em Edge/WebView e não apresentou cortes em 1100 × 850;
+- candidata `1.2.0` gerada pelo publicador canônico: 13.839.118 bytes;
+- SHA-256 do setup candidato: `5A95E8C7DF5BA4497AC369BC1FCA7BCE3165DE2EC3608064639028FEF1AAD116`.
 
-A tarefa adicional se chama `Mix Fiscal - Monitorar Integrador` e verifica o processo a cada
-cinco minutos. `Painel_Mix.bat` permite instalar/reativar e parar o monitor. Para manutenção,
-a opção 5 também desativa as tarefas nativas `BootStart`, `Startup` e `Watchdog`; a opção 2
-reativa todas elas. Scripts e logs ficam junto do executável, e o monitor aceita o nome padrão
-ou outro nome que contenha `integrador`. Se houver somente um EXE de aplicação na pasta,
-ele também pode ter qualquer outro nome.
+## Antes de produção
 
-O Painel Mix usa quebras de linha reais, sem BOM, e solicita elevação administrativa ao ser aberto.
-Há um teste que impede publicar novamente o BAT com sequências `\n` literais.
+1. gerar `1.2.0` somente pelo comando de [`PUBLICACAO.md`](PUBLICACAO.md);
+2. executar o teste completo autorizado em máquina cliente/VM;
+3. validar Windows 10/11 e Server 2016/2019/2022;
+4. testar uma máquina com WebView2 e outra sem;
+5. testar RDP com a mesma conta elevada e com conta diferente;
+6. revisar `git status --short -- web`, build do Next.js e artefatos públicos;
+7. mesclar em `main` e publicar pela Vercel somente após aprovação.
 
-O monitor agora executa o atualizador antes de verificar o processo. A versão `1.0.3`
-consulta o manifesto público do site, aceita somente downloads HTTPS do domínio configurado e
-atualiza cinco componentes: Integrador, Painel Mix, monitor, lançador silencioso e o próprio
-atualizador. Cada arquivo tem tamanho e SHA-256 validados; executáveis também têm o cabeçalho
-verificado. A troca mantém backups e restaura os componentes caso uma etapa falhe. O Painel Mix
-e o instalador exibem a versão instalada.
-
-O instalador chama `Painel_Mix.bat --install-monitor`. O BAT fornecido pelo operador foi usado
-como base e cadastra a tarefa por `wscript.exe`, mantendo o monitor invisível. O mesmo painel
-instala, consulta e desinstala o monitor sem deixar tarefas antigas duplicadas.
-
-## Branch v1.1 — diagnóstico e recuperação
-
-A branch `integrador-v1.1-diagnostico` acrescenta verificação automática do WebView2, cópia
-atômica com SHA-256, reparo de componentes mesmo sem mudança de versão, execução permanente do
-Integrador como administrador e relatórios em `logs\instalacao.log` e `logs\diagnostico.json`.
-A tela mostra as versões do setup, Integrador, Painel BAT e WebView2 e permite repetir a
-verificação do ambiente. O banco permanece fora do setup e continua sendo enviado pelo site.
-
-O manifesto gerado para versões a partir da `1.1.0` inclui o próprio instalador. Setups dessa
-geração conseguem baixar, validar e abrir uma versão superior mantendo a pasta de destino
-original. O diagnóstico registra ocorrências relacionadas encontradas no Microsoft Defender
-e gera informações para a TI sem alterar ou desativar a proteção da máquina.
-
-O pré-diagnóstico agora identifica a conta interativa da sessão RDP/console e a conta elevada.
-Quando o técnico fornece no UAC uma conta diferente daquela que executará o robô, a automação é
-bloqueada antes do login e da identidade do cliente. O setup testa os diretórios do perfil usados
-pelo Integrador e pelo WebView2, o diretório temporário, a pasta final e o serviço do Agendador.
-O Painel Mix cria o monitor com token interativo, sem `/RU` e sem solicitar uma senha invisível.
-
-Após um antivírus bloquear a extração do pacote anterior, a geração foi trocada de PyInstaller
-`onefile` para aplicação interna `onedir` embalada pelo Inno Setup. A automação deixou de usar
-Playwright e passou a acessar diretamente o protocolo local do WebView2 por WebSocket. Com isso,
-o `node.exe` de aproximadamente 92 MB foi removido e o setup caiu de cerca de 91 MB para 36 MB.
-
-## Validações
-
-- 26 testes locais passaram, incluindo diagnóstico de contas/perfil, integridade e proteção contra retorno ao `onefile`;
-- os cinco arquivos Python principais compilam com `py_compile`;
-- o pacote contém `desktop-integrador.exe`, `Painel_Mix.bat`, `atualizador_mix.ps1`,
-  `monitor_mix.ps1`, `run_silent.vbs`, `integrador_version.json` e o cliente CDP/WebSocket;
-- o runtime interno possui 11 entradas CArchive e nenhum arquivo do Playwright/Node;
-- a instalação silenciosa de validação terminou com código `0`, criou os 156 arquivos esperados
-  e respeitou o destino solicitado;
-- a verificação manual do pacote final pelo Microsoft Defender retornou zero detecções;
-- o cliente CDP conectou a um Edge local isolado, localizou um campo e o preencheu corretamente;
-- o manifesto do pacote solicita `requireAdministrator`;
-- interface responsiva validada com rolagem vertical, sem corte horizontal e olho visível;
-- artefato candidato v1.1.0: `entrega\Instalador-Mix-Fiscal.exe`, 36.426.042 bytes;
-- SHA-256: `02EA3E3A0977A4C0E48AD1242FC67D1DE329C8A5976490404598D6F1CD95FCE2`;
-- o pacote ainda não possui assinatura digital;
-- a versão idempotente precisa de um teste completo em uma máquina cliente/VM limpa.
-
-Os testes anteriores no computador de desenvolvimento comprovaram login, geração nativa,
-salvamento, serviço Mix Fiscal, tarefas nativas, consulta da API e status online. Já existem
-registros anteriores para o CNPJ usado naquele teste; esta versão permite essas identidades e
-confirma somente o ID exato usado pela instalação atual.
+O teste local não executou o Integrador real, não autenticou no portal e não alterou nenhum CNPJ ou
+Machine ID. Essas ações exigem autorização pontual para o ambiente e cliente exatos.

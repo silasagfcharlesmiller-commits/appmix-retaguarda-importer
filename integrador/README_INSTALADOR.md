@@ -1,140 +1,88 @@
 # Instalador automatizado do Integrador
 
-O arquivo pronto para levar ao cliente fica em `entrega\Instalador-Mix-Fiscal.exe`.
-Ao clicar em **Instalar**, ele solicita permissão de administrador e executa o fluxo completo:
+O arquivo entregue ao cliente fica em:
 
-Antes de autenticar ou alterar o Machine ID, a geração `1.1` compara a conta da sessão
-Windows/RDP com a conta que recebeu a elevação do UAC. Se forem diferentes, o fluxo é
-bloqueado e orienta a TI a entrar com a conta que permanecerá executando o Integrador. Também
-testa leitura, gravação e renomeação na pasta de instalação, `%APPDATA%`, `%LOCALAPPDATA%`,
-`%TEMP%` e no perfil `EBWebView`, além de confirmar o serviço do Agendador de Tarefas. Assim,
-uma restrição de perfil é encontrada antes do login e da configuração do cliente.
+```text
+integrador\entrega\Instalador-Mix-Fiscal.exe
+```
 
-1. copia o Integrador para a mesma pasta onde o instalador foi colocado;
-2. abre o WebView2 e faz login com os dados informados;
-3. aproveita o Machine ID que o próprio Integrador já criou;
-4. grava esse ID imediatamente para que uma nova tentativa use a mesma identidade;
-5. preserva outros IDs do mesmo CNPJ, pois XML e robô podem usar identidades diferentes;
-6. abre **Configurações** pelo menu e confirma novamente o login;
-7. preenche o CNPJ, adiciona o serviço `mixfiscal` somente se ele ainda não estiver selecionado, rola até o final e salva;
-8. clica em **Instalar** na tela do Integrador e ativa a inicialização nativa;
-9. chama `Painel_Mix.bat --install-monitor`, instala a tarefa invisível por VBS e a consulta;
-10. consulta a mesma listagem da API usada pelo App Mix até confirmar o ID online;
-11. remove a depuração temporária e deixa o Integrador aberto.
+Crie a pasta definitiva na máquina, por exemplo `C:\Mix Fiscal\integrador`, coloque o setup nela e
+abra-o. Ele instala todos os componentes nessa mesma pasta.
 
-Na geração `1.1`, o setup também confirma o WebView2 antes de abrir o Integrador, valida cada
-componente por SHA-256 e marca `desktop-integrador.exe` para sempre executar como administrador.
-Os dados de banco continuam sendo enviados e gerenciados pelo site; o setup configura CNPJ,
-arquivos locais, serviço Mix Fiscal e Machine ID.
+## O que ele faz
 
-O instalador nunca limpa os arquivos de identidade. Se `config\machine_id.json` e
-`%APPDATA%\mixfiscal-integrador\local_settings.json` tiverem IDs diferentes, ele para e
-preserva os dois para revisão. A tela segue o visual do App Mix, ajusta-se à área útil do
-Windows, oferece rolagem em escala ampliada, formata o CNPJ e possui um botão de olho para
-mostrar ou ocultar a senha. A senha digitada não é salva.
+1. solicita administrador;
+2. copia o Integrador, o Painel Mix, o monitor e o atualizador;
+3. verifica o WebView2 e instala o Runtime oficial da Microsoft quando estiver ausente;
+4. verifica se a conta elevada é a mesma conta conectada e se ela consegue usar AppData, TEMP e o
+   Agendador;
+5. abre a tela Go/Wails com CNPJ, login e senha protegida por olho;
+6. autentica na API e no Integrador;
+7. reutiliza o Machine ID local ou gera somente uma vez quando nenhum existir;
+8. abre Configurações, confirma o login quando solicitado, informa CNPJ e serviço `mixfiscal`;
+9. clica **Salvar Configurações** e depois **Instalar/Iniciar**;
+10. instala o monitor pelo `Painel_Mix.bat` sem janela piscando;
+11. confirma na API que o ID exato usado pelo robô ficou online;
+12. deixa o Integrador aberto e marcado para sempre solicitar administrador.
 
-A idempotência é por máquina: uma nova tentativa reutiliza o mesmo ID local do robô. A
-existência de um ID diferente para XML ou para outra instalação do CNPJ não bloqueia o fluxo.
+Os dados de banco e de retaguarda continuam sendo enviados pelo site. O setup não apaga IDs de
+XML ou de outras instalações. Se os dois arquivos locais tiverem IDs conflitantes, ele para e
+preserva ambos para revisão.
+
+## Nova interface e runtime
+
+A geração `1.2` usa Go + Wails + HTML/CSS/JavaScript, a mesma base técnica do Integrador oficial.
+O setup não transporta Python, PyQt, PyInstaller, Playwright ou Node e não extrai um runtime grande
+no `%TEMP%`. O bootstrap Go prepara o WebView2 antes de abrir a tela.
+
+Prévia da tela: [`go-installer/docs/preview-installer-go-wails.png`](go-installer/docs/preview-installer-go-wails.png).
+
+Sistemas aceitos pelo setup: Windows 10 x64 build 14393 ou superior, Windows 11 x64 e Windows
+Server 2016 ou superior x64. Servidores precisam de uma sessão RDP/console interativa com a mesma
+conta que receber a elevação.
+
+## Segurança e diagnóstico
+
+A senha Mix é usada somente em memória e o campo é limpo após o fluxo. A senha do UAC pertence ao
+Windows e nunca passa pelo instalador.
+
+O botão de instalar só é liberado quando o pré-diagnóstico confirma a conta, os diretórios e o
+Agendador. Logs ficam em:
+
+```text
+logs\instalacao.log
+logs\diagnostico.json
+painel_install_log.txt
+atualizador_log.txt
+```
+
+O programa não desativa antivírus, EDR, UAC ou política corporativa. A assinatura digital de código
+da Mix continua recomendada para reduzir bloqueios por reputação.
 
 ## Monitor e manutenção
 
-Antes de executar, crie a pasta desejada, por exemplo `C:\Mix Fiscal\integrador`, e coloque o
-`Instalador-Mix-Fiscal.exe` dentro dela. O instalador copia `Painel_Mix.bat` e os demais
-componentes para essa mesma pasta. Abra esse painel quando
-precisar fazer manutenção; ele solicita automaticamente a permissão de administrador:
+Abra `Painel_Mix.bat`:
 
-- **2 - Instalar / Ativar monitoramento**: instala ou reativa o monitor invisível e as tarefas nativas;
-- **5 - Desinstalar / Desativar monitoramento**: remove a tarefa do monitor e desativa `BootStart`, `Startup` e
-  `Watchdog` do Integrador;
-- **4 - Parar Integrador**: encerra o processo depois que o monitoramento foi parado.
+- opção 2: instalar/reativar monitoramento;
+- opção 3: iniciar Integrador;
+- opção 4: parar Integrador;
+- opção 5: desinstalar/desativar monitoramento para manutenção.
 
-Terminada a manutenção, use novamente a opção 2 e depois a opção 3 para iniciar.
-O painel, o script PowerShell e o log ficam junto do executável. O monitor detecta primeiro
-`desktop-integrador.exe`, aceita um arquivo renomeado que contenha `integrador` no nome e,
-quando houver somente um EXE de aplicação na pasta, aceita qualquer outro nome.
+O monitor executa invisível a cada cinco minutos, mantém o Integrador ativo e verifica atualizações.
 
-A tarefa adicional usa o token interativo da conta já validada pelo setup. Ela não solicita nem
-armazena senha do Windows e não abre uma pergunta de senha invisível durante a instalação. Em
-servidores, o monitor funciona enquanto essa conta permanecer conectada; uma aplicação WebView2
-visível não deve ser executada na sessão isolada da conta `SYSTEM`.
+## Atualizações
 
-## Atualização automática
+O monitor atualiza e repara o Integrador, BAT, monitor, VBS e atualizador usando HTTPS, tamanho e
+SHA-256. Ao abrir o setup, a tela também consulta se existe um instalador mais recente; se houver,
+baixa, valida e abre a nova versão na mesma pasta.
 
-O instalador também copia `atualizador_mix.ps1` e `integrador_version.json` para a pasta do
-Integrador. A cada execução de cinco minutos, o monitor consulta o manifesto público do App
-Mix. Quando encontra uma versão superior, ele:
-
-1. baixa os componentes alterados por HTTPS;
-2. confere o tamanho e o SHA-256 de cada arquivo, além do cabeçalho dos executáveis;
-3. encerra somente o processo que corresponde ao executável daquela pasta;
-4. cria backups, substitui os arquivos e grava a versão local;
-5. abre o Integrador novamente; se a troca falhar, restaura o backup.
-
-Desde a versão `1.0.1`, o ciclo cobre `desktop-integrador.exe`, `Painel_Mix.bat`,
-`monitor_mix.ps1`, `run_silent.vbs` e o próprio `atualizador_mix.ps1`. O Painel Mix e a janela
-do instalador mostram a versão instalada.
-
-A tela da geração `1.1` mostra as versões do setup, Integrador, Painel BAT e WebView2, além do
-estado do monitor e da execução administrativa. O botão **Verificar ambiente e atualizações**
-repete a consulta. Quando o WebView2 está ausente, o setup baixa o bootstrapper oficial da
-Microsoft, confirma a assinatura digital, instala silenciosamente, aguarda e verifica novamente.
-
-Os componentes são copiados de forma atômica e conferidos por SHA-256. O atualizador também
-verifica os arquivos quando a versão remota é igual à local, permitindo reparar um componente
-ausente ou alterado. Os relatórios ficam em `logs\instalacao.log` e `logs\diagnostico.json`, com
-cópia de emergência em `%ProgramData%\MixFiscal\Logs`. Se a proteção remover novamente o mesmo
-arquivo, o setup informa o diagnóstico para a TI; ele não desativa antivírus, EDR ou políticas.
-
-O pacote `1.1` usa Inno Setup e instala a aplicação auxiliar em `.mix-installer`. Essa aplicação
-fica em formato de pasta e não precisa descompactar Python a cada abertura. A automação conversa
-diretamente com o protocolo local do WebView2 por WebSocket; Playwright e o `node.exe` de cerca
-de 92 MB não fazem mais parte do instalador. O build falha se detectar novamente qualquer um
-desses componentes.
-
-O log fica em `atualizador_log.txt`, ao lado do Integrador. A opção **5 - Desinstalar / Desativar
-monitoramento** do Painel Mix também interrompe as verificações de atualização durante uma
-manutenção. As máquinas que já receberam uma versão antiga do instalador precisam executar
-o novo pacote uma vez; a partir daí, as versões seguintes são automáticas.
-
-Para preparar uma nova versão do Integrador e do instalador:
+Para gerar uma versão, leia [`PUBLICACAO.md`](PUBLICACAO.md) e use somente:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File integrador\PUBLICAR_ATUALIZACAO.ps1 `
-  -Versao 1.0.1 `
-  -Executavel C:\caminho\desktop-integrador.exe
+powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\PUBLICAR_ATUALIZACAO.ps1 `
+  -Versao 1.2.0 `
+  -Executavel "C:\caminho\desktop-integrador.exe"
 ```
 
-O roteiro completo de versão, validação, commit, deploy da Vercel e teste remoto está em
-[`PUBLICACAO.md`](PUBLICACAO.md). Consulte esse arquivo antes de qualquer atualização.
-
-O comando cria `web/public/integrador-updates/version.json`, copia o executável que será
-baixado e publica o instalador completo em `web/public/downloads/Instalador-Mix-Fiscal.exe`.
-Revise e envie esses arquivos no mesmo commit. Nunca reutilize um número de versão.
-
-## Arquivos do projeto
-
-- `instalador_gui.py`: tela com CNPJ, usuário e senha;
-- `automacao_primeiro_acesso.py`: automação WebView2/Wails, identidade e monitor;
-- `instalador_core.py`: validação, API e escrita JSON segura;
-- `cdp_browser.py`: comunicação direta com a porta local do WebView2, sem Playwright;
-- `diagnostico_instalador.py`: versões, WebView2, permissões, integridade e relatório para a TI;
-- `Painel_Mix.bat`: controle manual do monitor;
-- `atualizador_mix.ps1`: atualização validada e restauração em caso de falha;
-- `PUBLICAR_ATUALIZACAO.ps1`: gera manifesto, binário público e instalador;
-- `verificar_pacote.py`: descompacta e valida integralmente o pacote antes da publicação;
-- `test_instalador.py`: testes locais sem alterar a API;
-- `GERAR_INSTALADOR.ps1`: recompila o EXE com UAC.
-- `Instalador-Mix-Fiscal.iss`: definição do pacote convencional do Inno Setup.
-
-## Validação e compilação
-
-```powershell
-python -m py_compile integrador\instalador_core.py integrador\cdp_browser.py integrador\diagnostico_instalador.py integrador\automacao_primeiro_acesso.py integrador\instalador_gui.py
-python -m unittest discover -s integrador -p test_instalador.py
-powershell -ExecutionPolicy Bypass -File integrador\GERAR_INSTALADOR.ps1
-```
-
-Antes da distribuição ampla, execute o pacote em uma máquina Windows limpa com o WebView2
-Runtime instalado e em outra sem o Runtime, validando a instalação oficial automática. Um
-certificado de assinatura de código da Mix Fiscal continua recomendado para reduzir alertas de
-reputação em antivírus corporativos e no SmartScreen.
+Detalhes completos de arquitetura, permissões, automação e sistema operacional estão em
+[`ARQUITETURA_INSTALADOR.md`](ARQUITETURA_INSTALADOR.md).

@@ -1,4 +1,4 @@
-"""Valida o runtime onedir e o instalador convencional gerado pelo Inno Setup."""
+"""Valida os executáveis nativos Go/Wails e o setup Inno gerado."""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ import hashlib
 import json
 import sys
 from pathlib import Path
-
-from PyInstaller.archive.readers import CArchiveReader
 
 
 def sha256(path: Path) -> str:
@@ -39,17 +37,19 @@ def main() -> int:
 
     if not setup.is_file() or setup.stat().st_size < 1_000_000 or not mz(setup):
         raise RuntimeError("O instalador Inno Setup não é um executável Windows válido.")
-    runtime_exe = runtime / "Instalador-Mix-Fiscal-App.exe"
-    if not runtime_exe.is_file() or not mz(runtime_exe):
-        raise RuntimeError("A aplicação interna do instalador está ausente ou inválida.")
 
-    archive = CArchiveReader(str(runtime_exe))
-    for name, entry in archive.toc.items():
-        if entry[4] in {"o", "n"}:
-            continue
-        data = archive.extract(name)
-        if len(data) != entry[2]:
-            raise RuntimeError(f"Entrada interna corrompida: {name!r}.")
+    required_runtime = {
+        "Instalador-Mix-Fiscal-App.exe",
+        "MixFiscal-Bootstrap.exe",
+        "payload_manifest.json",
+    }
+    runtime_files = {path.name for path in runtime.iterdir() if path.is_file()}
+    if runtime_files != required_runtime:
+        raise RuntimeError(f"Runtime Go/Wails inesperado: {sorted(runtime_files)}")
+    for name in ("Instalador-Mix-Fiscal-App.exe", "MixFiscal-Bootstrap.exe"):
+        executable = runtime / name
+        if executable.stat().st_size < 500_000 or not mz(executable):
+            raise RuntimeError(f"Executável nativo ausente ou inválido: {name}.")
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     files = manifest.get("files", {})
@@ -66,21 +66,22 @@ def main() -> int:
         if source.stat().st_size != int(metadata["size"]) or sha256(source) != metadata["sha256"]:
             raise RuntimeError(f"Manifesto interno não corresponde a {name}.")
 
-    forbidden = [
-        path for path in runtime.rglob("*")
-        if path.name.casefold() == "node.exe"
-        or any(part.casefold() == "playwright" for part in path.parts)
-    ]
-    if forbidden:
-        raise RuntimeError(f"Playwright/Node ainda foi incluído no runtime: {forbidden[0]}")
-
-    embedded_manifest = runtime / "_internal" / "payload_manifest.json"
-    if not embedded_manifest.is_file() or sha256(embedded_manifest) != sha256(manifest_path):
+    embedded_manifest = runtime / "payload_manifest.json"
+    if sha256(embedded_manifest) != sha256(manifest_path):
         raise RuntimeError("O manifesto de componentes não foi incorporado ao runtime.")
 
+    forbidden_names = {"node.exe", "python3.dll", "python312.dll"}
+    forbidden = [
+        path for path in runtime.rglob("*")
+        if path.name.casefold() in forbidden_names
+        or any(part.casefold() in {"playwright", "pyqt6", "_internal"} for part in path.parts)
+    ]
+    if forbidden:
+        raise RuntimeError(f"Runtime legado ainda incluído no pacote: {forbidden[0]}")
+
     print(
-        f"Pacote convencional íntegro: runtime com {len(archive.toc)} entradas, "
-        f"sem Playwright/Node; setup {setup.stat().st_size} bytes; SHA-256 {sha256(setup)}."
+        "Pacote Go/Wails íntegro: 2 executáveis nativos, sem Python/PyQt/Playwright/Node; "
+        f"setup {setup.stat().st_size} bytes; SHA-256 {sha256(setup)}."
     )
     return 0
 
