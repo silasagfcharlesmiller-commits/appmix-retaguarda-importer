@@ -133,18 +133,18 @@ const guidedSetupSteps = [
     optional: true,
   },
   {
-    shortTitle: "Divergências",
-    title: "Comparar divergências",
-    description: "Escolha os campos que o robô deve comparar. Na simulação final, a grade mostrará as marcações calculadas por UF.",
-    target: "comparar-divergencia",
-    optional: true,
-  },
-  {
     shortTitle: "Regras",
     title: "Escolher origem das regras",
     description: "Escolha entre usar exatamente suas marcações ou controlar os cinco impostos laranja conforme o estado.",
     target: "template-fiscal-overrides",
     optional: false,
+  },
+  {
+    shortTitle: "Divergências",
+    title: "Comparar divergências",
+    description: "Escolha os campos que o robô deve comparar. Se usar regras por estado, simule uma UF e confira o resultado na própria grade.",
+    target: "comparar-divergencia",
+    optional: true,
   },
   {
     shortTitle: "Simular",
@@ -518,12 +518,12 @@ export default function TemplatesPage() {
     if (guidedStep === null || !dataReady) return;
     setExpandAll(false);
     setOpen(guidedStep === 0 ? taxes[0][0] : "");
-    setDivergenceOpen(guidedStep === 4);
+    setDivergenceOpen(guidedStep === 5);
     setOpenMasters([]);
     setXmlOpen(guidedStep === 1);
     setSchedulerOpen(guidedStep === 2);
     setConnectionOpen(guidedStep === 3);
-    setExceptionsOpen(guidedStep === 5);
+    setExceptionsOpen(guidedStep === 4);
     setSimulationOpen(guidedStep === 6);
     const timer = window.setTimeout(() => {
       document.getElementById(guidedSetupSteps[guidedStep].target)?.scrollIntoView({
@@ -611,7 +611,7 @@ export default function TemplatesPage() {
         : "desativado",
       },
     });
-    if (guidedStep !== null) setGuidedStep(4);
+    if (guidedStep !== null) setGuidedStep(5);
     setDivergenceOpen(true);
     window.setTimeout(() => {
       setDivergenceOpen(true);
@@ -1402,6 +1402,29 @@ export default function TemplatesPage() {
               </div>
             )}
           </section>
+          <section className="divergence-card fiscal-exceptions-card" id="template-fiscal-overrides">
+            <button className="divergence-title fiscal-collapse-title" type="button" onClick={() => setExceptionsOpen(!exceptionsOpen)}>
+              <div>
+                <span className="eyebrow dark">ORIGEM DOS IMPOSTOS</span>
+                <h2>Como definir as marcações?</h2>
+                <p>Escolha uma regra simples para todo o template. Se usar o estado, você ainda poderá criar exceções nos cinco campos fiscais.</p>
+              </div>
+              {exceptionsOpen ? <ChevronUp/> : <ChevronDown/>}
+            </button>
+            {exceptionsOpen && <div className="fiscal-section-body">
+              <div className="rule-source-options">
+                <button type="button" className={data.configuracao.modo_regras_fiscais === "desativado" ? "selected" : ""} onClick={() => selectFiscalSource(false)}>
+                  <Check size={20}/><span><strong>Usar conforme marquei</strong><small>Todos os impostos seguem exatamente as caixas escolhidas em Comparar divergências.</small></span>
+                </button>
+                <button type="button" className={data.configuracao.modo_regras_fiscais !== "desativado" ? "selected state" : "state"} onClick={() => selectFiscalSource(true)}>
+                  <MapPinned size={20}/><span><strong>Usar regra por estado</strong><small>Somente os cinco impostos laranja seguem a UF do CNPJ. Os demais continuam como você marcou.</small></span>
+                </button>
+              </div>
+              {data.configuracao.modo_regras_fiscais === "desativado" ? (
+                <div className="manual-rule-confirmation"><Check size={19}/><span><strong>Configuração simples selecionada</strong><small>Marque os campos diretamente na grade. Regras estaduais e exceções não serão usadas.</small></span></div>
+              ) : <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>A grade foi aberta no ICMS de Saída. Configure ali a simulação e, se necessário, a exceção de cada imposto.</small></span><button type="button" onClick={() => selectFiscalSource(true)}>Abrir grade</button></div>}
+            </div>}
+          </section>
           <section className="divergence-card" id="comparar-divergencia">
             <button
               className="divergence-title"
@@ -1541,29 +1564,6 @@ export default function TemplatesPage() {
               </>
             )}
           </section>
-          <section className="divergence-card fiscal-exceptions-card" id="template-fiscal-overrides">
-            <button className="divergence-title fiscal-collapse-title" type="button" onClick={() => setExceptionsOpen(!exceptionsOpen)}>
-              <div>
-                <span className="eyebrow dark">ORIGEM DOS IMPOSTOS</span>
-                <h2>Como definir as marcações?</h2>
-                <p>Escolha uma regra simples para todo o template. Se usar o estado, você ainda poderá criar exceções nos cinco campos fiscais.</p>
-              </div>
-              {exceptionsOpen ? <ChevronUp/> : <ChevronDown/>}
-            </button>
-            {exceptionsOpen && <div className="fiscal-section-body">
-              <div className="rule-source-options">
-                <button type="button" className={data.configuracao.modo_regras_fiscais === "desativado" ? "selected" : ""} onClick={() => selectFiscalSource(false)}>
-                  <Check size={20}/><span><strong>Usar conforme marquei</strong><small>Todos os impostos seguem exatamente as caixas escolhidas em Comparar divergências.</small></span>
-                </button>
-                <button type="button" className={data.configuracao.modo_regras_fiscais !== "desativado" ? "selected state" : "state"} onClick={() => selectFiscalSource(true)}>
-                  <MapPinned size={20}/><span><strong>Usar regra por estado</strong><small>Somente os cinco impostos laranja seguem a UF do CNPJ. Os demais continuam como você marcou.</small></span>
-                </button>
-              </div>
-              {data.configuracao.modo_regras_fiscais === "desativado" ? (
-                <div className="manual-rule-confirmation"><Check size={19}/><span><strong>Configuração simples selecionada</strong><small>Marque os campos diretamente na grade. Regras estaduais e exceções não serão usadas.</small></span></div>
-              ) : <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>A grade foi aberta no ICMS de Saída. Configure ali a simulação e, se necessário, a exceção de cada imposto.</small></span><button type="button" onClick={() => selectFiscalSource(true)}>Abrir grade</button></div>}
-            </div>}
-          </section>
           <section className="divergence-card fiscal-simulation-card" id="template-fiscal-simulation">
             <button className="divergence-title fiscal-collapse-title" type="button" onClick={() => setSimulationOpen(!simulationOpen)}>
               <div>
@@ -1575,9 +1575,9 @@ export default function TemplatesPage() {
             </button>
             {simulationOpen && <div className="fiscal-section-body">
               {data.configuracao.modo_regras_fiscais === "desativado" ? (
-                <div className="final-manual-summary"><Check size={22}/><span><strong>Usar conforme marquei</strong><small>O template está pronto para salvar. Todos os impostos seguirão exatamente as marcações feitas em Comparar divergências; nenhuma regra estadual ou exceção será usada.</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(5); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Mudar para regra por estado</button></div>
+                <div className="final-manual-summary"><Check size={22}/><span><strong>Usar conforme marquei</strong><small>O template está pronto para salvar. Todos os impostos seguirão exatamente as marcações feitas em Comparar divergências; nenhuma regra estadual ou exceção será usada.</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(4); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Mudar para regra por estado</button></div>
               ) : <>
-                <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>{data.configuracao.modo_regras_fiscais === "simulacao" ? "Os próximos jobs apenas calcularão e registrarão o resultado no log." : "Os próximos jobs aplicarão no cliente o resultado da UF real do CNPJ."}</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(5); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Alterar modo ou exceções</button></div>
+                <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>{data.configuracao.modo_regras_fiscais === "simulacao" ? "Os próximos jobs apenas calcularão e registrarão o resultado no log." : "Os próximos jobs aplicarão no cliente o resultado da UF real do CNPJ."}</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(4); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Alterar modo ou exceções</button></div>
                 <div className="final-state-summary"><span><strong>{previewUf ? `Prévia de ${previewUf} configurada` : "Prévia visual ainda não selecionada"}</strong><small>{previewUf ? `${fiscalPreviewMarked} marcados, ${fiscalPreview.length - fiscalPreviewMarked} desmarcados e ${fiscalPreviewChanges} mudanças aparecem na própria grade.` : "A UF, a simulação e as exceções são configuradas diretamente em Comparar divergências."}</small></span><button type="button" className="fiscal-grid-preview-button" onClick={() => previewUf ? showFiscalPreviewInGrid() : selectFiscalSource(true)}><MapPinned size={17}/> Abrir Comparar divergências</button></div>
               </>}
             </div>}
