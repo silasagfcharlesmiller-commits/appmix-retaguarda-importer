@@ -430,7 +430,7 @@
 
 .guided-final-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -706,6 +706,160 @@
   background: color-mix(in srgb, #8b5cf6 8%, var(--white));
 }
 
+.template-fiscal-override-grid label > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.template-fiscal-override-grid label > span em {
+  padding: 3px 6px;
+  color: #6d3ed1;
+  border-radius: 999px;
+  background: color-mix(in srgb, #8b5cf6 13%, var(--white));
+  font-size: .56rem;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.rule-source-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.rule-source-options > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 11px;
+  min-height: 96px;
+  padding: 15px;
+  color: var(--ink);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.rule-source-options > button > span,
+.rule-run-options > button > span {
+  display: grid;
+  gap: 4px;
+}
+
+.rule-source-options small,
+.rule-run-options small {
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.4;
+}
+
+.rule-source-options > button.selected {
+  color: var(--green-dark);
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 9%, var(--white));
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.rule-source-options > button.state.selected {
+  color: #174b88;
+  border-color: #4d8bd2;
+  background: #edf6ff;
+  box-shadow: inset 0 0 0 1px #4d8bd2;
+}
+
+.manual-rule-confirmation,
+.state-rule-status,
+.final-manual-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  color: var(--green-dark);
+  border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--green) 7%, var(--white));
+}
+
+.manual-rule-confirmation > span,
+.state-rule-status > span,
+.final-manual-summary > span {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+
+.manual-rule-confirmation small,
+.state-rule-status small,
+.final-manual-summary small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.state-rule-status {
+  color: #174b88;
+  border-color: #9bc4ee;
+  background: #f1f7ff;
+}
+
+.state-rule-status > button,
+.final-manual-summary > button {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: var(--white);
+  font-size: .7rem;
+  font-weight: 850;
+}
+
+.rule-execution-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #9bc4ee;
+  border-radius: 12px;
+  background: #f6faff;
+}
+
+.rule-execution-section > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.rule-execution-section > div:first-child small {
+  color: var(--muted);
+}
+
+.rule-run-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.rule-run-options > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--white);
+  text-align: left;
+}
+
+.rule-run-options > button.selected {
+  color: #174b88;
+  border-color: #4d8bd2;
+  background: #e7f2ff;
+  box-shadow: inset 0 0 0 1px #4d8bd2;
+}
+
 .exception-example {
   margin: 0;
   padding: 12px 14px;
@@ -813,6 +967,11 @@
   background: #fff;
   font-size: .7rem;
   font-weight: 850;
+}
+
+.field-type-legend i.exception {
+  border-color: #8b5cf6;
+  background: color-mix(in srgb, #8b5cf6 16%, var(--white));
 }
 
 .fiscal-auto-banner {
@@ -1046,6 +1205,20 @@
   color: #dbc397;
 }
 
+[data-theme="dark"] .rule-source-options > button.state.selected,
+[data-theme="dark"] .state-rule-status,
+[data-theme="dark"] .rule-execution-section,
+[data-theme="dark"] .rule-run-options > button.selected {
+  color: #b9dcff;
+  border-color: #477eb8;
+  background: #14283a;
+}
+
+[data-theme="dark"] .template-fiscal-override-grid label > span em {
+  color: #d4c8ff;
+  background: #3b315c;
+}
+
 @media (max-width: 700px) {
   .template-wizard {
     width: 100%;
@@ -1116,7 +1289,9 @@
   }
 
   .guided-fiscal-modes,
-  .guided-final-summary {
+  .guided-final-summary,
+  .rule-source-options,
+  .rule-run-options {
     grid-template-columns: 1fr;
   }
 
@@ -1162,6 +1337,16 @@
   .fiscal-preview-ready .fiscal-grid-preview-button {
     justify-self: stretch;
     justify-content: center;
+  }
+
+  .state-rule-status,
+  .final-manual-summary {
+    flex-wrap: wrap;
+  }
+
+  .state-rule-status > button,
+  .final-manual-summary > button {
+    margin-left: 29px;
   }
 
   .exception-flow-help > svg {

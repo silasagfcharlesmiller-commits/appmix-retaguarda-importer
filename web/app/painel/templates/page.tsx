@@ -140,16 +140,16 @@ const guidedSetupSteps = [
     optional: true,
   },
   {
-    shortTitle: "Exceções",
-    title: "Exceções do template",
-    description: "Opcional. Defina somente os campos que devem contrariar a regra estadual; os demais continuam seguindo a UF.",
+    shortTitle: "Regras",
+    title: "Escolher origem das regras",
+    description: "Escolha entre usar exatamente suas marcações ou controlar os cinco impostos laranja conforme o estado.",
     target: "template-fiscal-overrides",
-    optional: true,
+    optional: false,
   },
   {
     shortTitle: "Simular",
-    title: "Simular e finalizar",
-    description: "Escolha uma UF, veja exatamente como as cinco flags ficariam e só então defina o modo de aplicação e salve.",
+    title: "Conferir e finalizar",
+    description: "Confira a escolha. Se estiver usando regras por estado, simule uma UF antes de salvar.",
     target: "template-fiscal-simulation",
     optional: false,
   },
@@ -1001,7 +1001,7 @@ export default function TemplatesPage() {
               <article><b>1</b><div><strong>Usar somente o que marquei</strong><p>O cliente recebe exatamente os checkboxes salvos em Comparar divergências, independentemente da UF.</p></div></article>
               <article className="simulation"><b>2</b><div><strong>Testar regra por estado — recomendado</strong><p>Mostra na grade e registra no log o que as cinco regras mudariam, mas mantém as marcações originais no cliente.</p></div></article>
               <article><b>3</b><div><strong>Aplicar regra por estado</strong><p>Somente os cinco campos laranja recebem o valor da UF. Os demais impostos continuam seguindo o template.</p></div></article>
-              <article><b>4</b><div><strong>Exceções do template</strong><p>“Sempre marcado” ou “Sempre desmarcado” tem prioridade sobre a UF apenas neste template. Os campos em “Seguir regra da UF” continuam automáticos.</p></div></article>
+              <article><b>4</b><div><strong>Exceções por imposto</strong><p>Uma exceção faz somente aquele imposto manter o valor marcado ou desmarcado no template e ignorar a regra estadual.</p></div></article>
             </div>
             <p className="fiscal-help-note">Use “Pré-visualizar regras para a UF” para conferir o valor final e a origem de cada campo antes de salvar. Para incluir ou remover estados, abra <a href="/painel/regras-fiscais">Regras por UF</a>.</p>
             <button type="button" className="primary-button" onClick={() => setFiscalHelpOpen(false)}>Entendi</button>
@@ -1175,6 +1175,7 @@ export default function TemplatesPage() {
               <span><b>{data.configuracao_xml.paths.length}</b><small>origens XML</small></span>
               <span><b>{data.configuracao_xml.scheduler?.command ? "Sim" : "Não"}</b><small>scheduler configurado</small></span>
               <span><b>{connection.banco_nome && connection.usuario ? "Sim" : "Não"}</b><small>conexão configurada</small></span>
+              <span><b>{data.configuracao.modo_regras_fiscais === "desativado" ? "Manual" : data.configuracao.modo_regras_fiscais === "simulacao" ? "Simular" : "Por estado"}</b><small>modo dos impostos</small></span>
             </div>
           )}
 
@@ -1396,9 +1397,9 @@ export default function TemplatesPage() {
             {divergenceOpen && (
               <>
                 {previewUf ? <div className="preview-result-banner"><MapPinned size={18}/><span><strong>Você está vendo a prévia de {previewUf}</strong><small>As caixas azuis mostram o resultado da regra estadual, sem alterar a marcação original do template.</small></span><div className="preview-result-actions"><button type="button" onClick={() => setPreviewUf("")}>Voltar às marcações originais</button><button type="button" onClick={returnToFiscalSimulation}>Voltar à etapa Simular</button></div></div>
-                  : <div className="compare-base-help"><Check size={18}/><span><strong>Marque aqui o padrão do template</strong><small>Os campos laranja possuem regra por estado, mas continuam editáveis agora. Eles só serão substituídos no job se você escolher “Aplicar regra por estado” na última etapa.</small></span></div>}
+                  : <div className="compare-base-help"><Check size={18}/><span><strong>Marque aqui o padrão do template</strong><small>Os campos laranja possuem regra por estado. Um campo roxo é uma exceção: ele mantém o valor escolhido no template e ignora a regra estadual.</small></span></div>}
                 <div className="divergence-toolbar">
-                  <div className="field-type-legend"><span><i className="standard"/> Marcação manual do template</span><span><i className="state"/> Possui regra por estado</span></div>
+                  <div className="field-type-legend"><span><i className="standard"/> Marcação manual</span><span><i className="state"/> Regra por estado</span><span><i className="exception"/> Exceção: ignora o estado</span></div>
                   <button
                     type="button"
                     onClick={() =>
@@ -1459,10 +1460,11 @@ export default function TemplatesPage() {
                                         const fiscalField = managedFiscalFields[full];
                                         const templateOverride = fiscalField ? data.configuracao.excecoes_regras_fiscais[fiscalField] : "herdar";
                                         const stateBehavior = fiscalField ? fiscalRules[previewUf]?.[fiscalField] : "herdar";
-                                        const behavior = previewUf && fiscalField
+                                        const hasTemplateException = data.configuracao.modo_regras_fiscais !== "desativado" && (templateOverride === "aplicar" || templateOverride === "desativar");
+                                        const behavior = fiscalField && (previewUf || hasTemplateException)
                                           ? (templateOverride === "aplicar" || templateOverride === "desativar" ? templateOverride : stateBehavior) : "herdar";
                                         const controlled = behavior === "aplicar" || behavior === "desativar";
-                                        const overrideControlled = controlled && (templateOverride === "aplicar" || templateOverride === "desativar");
+                                        const overrideControlled = controlled && hasTemplateException;
                                         return (
                                           <CheckBox
                                             key={full}
@@ -1476,7 +1478,7 @@ export default function TemplatesPage() {
                                             highlighted={controlled}
                                             exceptionHighlighted={overrideControlled}
                                             stateVariable={Boolean(fiscalField)}
-                                            hint={controlled ? `PRÉVIA: ${behavior === "aplicar" ? "Marcado" : "Desmarcado"} · ${overrideControlled ? "Exceção do template" : `Regra de ${previewUf}`}` : fiscalField ? "Regra por estado · marque o padrão do template" : undefined}
+                                            hint={controlled ? overrideControlled ? `EXCEÇÃO: manter ${behavior === "aplicar" ? "marcado" : "desmarcado"} · regra do estado ignorada` : `PRÉVIA: ${behavior === "aplicar" ? "Marcado" : "Desmarcado"} · Regra de ${previewUf}` : fiscalField ? "Regra por estado · marque o padrão do template" : undefined}
                                             change={(v) => {
                                               const next = structuredClone(
                                                 data.comparar_divergencia,
@@ -1507,73 +1509,78 @@ export default function TemplatesPage() {
           <section className="divergence-card fiscal-exceptions-card" id="template-fiscal-overrides">
             <button className="divergence-title fiscal-collapse-title" type="button" onClick={() => setExceptionsOpen(!exceptionsOpen)}>
               <div>
-                <span className="eyebrow dark">ETAPA OPCIONAL</span>
-                <h2>Exceções deste template</h2>
-                <p>Altere somente quando este template precisar contrariar a regra da UF. Se estiver em dúvida, mantenha todos como “Seguir regra da UF”.</p>
+                <span className="eyebrow dark">ORIGEM DOS IMPOSTOS</span>
+                <h2>Como definir as marcações?</h2>
+                <p>Escolha uma regra simples para todo o template. Se usar o estado, você ainda poderá criar exceções nos cinco campos fiscais.</p>
               </div>
               {exceptionsOpen ? <ChevronUp/> : <ChevronDown/>}
             </button>
             {exceptionsOpen && <div className="fiscal-section-body">
-              <div className="fiscal-section-tools"><span>O padrão seguro é não criar exceções. Elas entram no cálculo somente em “Testar regra por estado” ou “Aplicar regra por estado”.</span><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={16}/> Ver explicação</button></div>
-              <div className="exception-flow-help">
-                <span><b>Regra da UF</b><small>É o comportamento padrão.</small></span>
-                <ArrowRight size={18}/>
-                <span><b>Exceção do template</b><small>Tem prioridade apenas se você escolher marcado ou desmarcado.</small></span>
+              <div className="rule-source-options">
+                <button type="button" className={data.configuracao.modo_regras_fiscais === "desativado" ? "selected" : ""} onClick={() => { setPreviewUf(""); setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"desativado"}}); }}>
+                  <Check size={20}/><span><strong>Usar conforme marquei</strong><small>Todos os impostos seguem exatamente as caixas escolhidas em Comparar divergências.</small></span>
+                </button>
+                <button type="button" className={data.configuracao.modo_regras_fiscais !== "desativado" ? "selected state" : "state"} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:data.configuracao.modo_regras_fiscais === "desativado" ? "simulacao" : data.configuracao.modo_regras_fiscais}})}>
+                  <MapPinned size={20}/><span><strong>Usar regra por estado</strong><small>Somente os cinco impostos laranja seguem a UF do CNPJ. Os demais continuam como você marcou.</small></span>
+                </button>
               </div>
-              <div className="template-fiscal-override-grid">
-                {Object.entries(fiscalFieldLabels).map(([field, label]) => (
-                  <label key={field} className={(data.configuracao.excecoes_regras_fiscais[field] || "herdar") !== "herdar" ? "has-exception" : ""}>
-                    <span>{label}</span>
-                    <select value={data.configuracao.excecoes_regras_fiscais[field] || "herdar"} onChange={(event) => setData((current) => current ? ({...current, configuracao:{...current.configuracao, excecoes_regras_fiscais:{...current.configuracao.excecoes_regras_fiscais, [field]:event.target.value as FiscalBehavior}}}) : current)}>
-                      <option value="herdar">Seguir regra da UF (recomendado)</option>
-                      <option value="aplicar">Sempre marcado neste template</option>
-                      <option value="desativar">Sempre desmarcado neste template</option>
-                    </select>
-                  </label>
-                ))}
-              </div>
-              <p className="exception-example"><strong>Exemplo:</strong> se FECP estiver como “Sempre desmarcado”, essa escolha vence a regra estadual somente neste template. Os outros quatro campos continuam seguindo a UF.</p>
+              {data.configuracao.modo_regras_fiscais === "desativado" ? (
+                <div className="manual-rule-confirmation"><Check size={19}/><span><strong>Configuração simples selecionada</strong><small>Regras estaduais e exceções não serão usadas. Você pode seguir para a última etapa e salvar.</small></span></div>
+              ) : <>
+                <div className="rule-execution-section">
+                  <div><strong>Como os próximos jobs devem executar?</strong><small>Comece simulando; depois volte e ative a aplicação quando conferir o log.</small></div>
+                  <div className="rule-run-options">
+                    <button type="button" className={data.configuracao.modo_regras_fiscais === "simulacao" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"simulacao"}})}><ShieldCheck size={18}/><span><strong>Somente simular</strong><small>Calcula e registra, sem alterar o cliente.</small></span></button>
+                    <button type="button" className={data.configuracao.modo_regras_fiscais === "automatico" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"automatico"}})}><Check size={18}/><span><strong>Aplicar nos jobs</strong><small>Grava o resultado estadual no cliente.</small></span></button>
+                  </div>
+                </div>
+                <div className="fiscal-section-tools"><span><strong>Exceções por imposto:</strong> escolha uma somente quando aquele campo não puder seguir a regra do estado.</span><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={16}/> Ver explicação</button></div>
+                <div className="template-fiscal-override-grid">
+                  {Object.entries(fiscalFieldLabels).map(([field, label]) => (
+                    <label key={field} className={(data.configuracao.excecoes_regras_fiscais[field] || "herdar") !== "herdar" ? "has-exception" : ""}>
+                      <span>{label}{(data.configuracao.excecoes_regras_fiscais[field] || "herdar") !== "herdar" && <em>Regra do estado ignorada</em>}</span>
+                      <select value={data.configuracao.excecoes_regras_fiscais[field] || "herdar"} onChange={(event) => setData((current) => current ? ({...current, configuracao:{...current.configuracao, excecoes_regras_fiscais:{...current.configuracao.excecoes_regras_fiscais, [field]:event.target.value as FiscalBehavior}}}) : current)}>
+                        <option value="herdar">Usar regra por estado</option>
+                        <option value="aplicar">Exceção — manter marcado</option>
+                        <option value="desativar">Exceção — manter desmarcado</option>
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <p className="exception-example"><strong>Como funciona:</strong> uma exceção faz somente aquele imposto ignorar a regra estadual. Os outros campos laranja continuam seguindo normalmente a UF.</p>
+              </>}
             </div>}
           </section>
           <section className="divergence-card fiscal-simulation-card" id="template-fiscal-simulation">
             <button className="divergence-title fiscal-collapse-title" type="button" onClick={() => setSimulationOpen(!simulationOpen)}>
               <div>
                 <span className="eyebrow orange">ÚLTIMA ETAPA</span>
-                <h2>Simule antes de salvar</h2>
-                <p>Escolha uma UF para conferir as cinco flags controladas. Esta prévia não grava a UF no template.</p>
+                <h2>Conferir e salvar</h2>
+                <p>Se estiver usando regra por estado, você pode simular uma UF e conferir as marcações na grade.</p>
               </div>
               {simulationOpen ? <ChevronUp/> : <ChevronDown/>}
             </button>
             {simulationOpen && <div className="fiscal-section-body">
-            <label className="uf-preview-control"><span>1. ESCOLHA A UF DA SIMULAÇÃO</span>
-              <select value={previewUf} onChange={(event) => setPreviewUf(event.target.value)}>
-                <option value="">Selecione uma UF para ver o resultado</option>
-                {Object.keys(fiscalRules).sort().map((uf) => <option key={uf}>{uf}</option>)}
-              </select>
-              <small>No job real, o worker consulta automaticamente a UF do CNPJ. <a href="/painel/regras-fiscais">Editar regras estaduais →</a></small>
-            </label>
-            {previewUf ? (
-              <div className="fiscal-preview-ready">
-                <div><MapPinned size={22}/><span><strong>Prévia de {previewUf} pronta</strong><small>O resultado aparece somente na grade Comparar divergências, junto dos outros impostos.</small></span></div>
-                <div className="fiscal-preview-counts"><span><b>{fiscalPreviewMarked}</b> marcados</span><span><b>{fiscalPreview.length - fiscalPreviewMarked}</b> desmarcados</span><span><b>{fiscalPreviewChanges}</b> mudariam</span></div>
-                <button type="button" className="fiscal-grid-preview-button" onClick={showFiscalPreviewInGrid}><MapPinned size={17}/> Ver impostos marcados na grade Comparar divergências</button>
-                <small>Na grade, as caixas azuis são apenas uma prévia. Use “Voltar às marcações originais” para editar novamente o padrão manual.</small>
-              </div>
-            ) : <div className="fiscal-preview-empty"><MapPinned size={22}/><span><strong>Aguardando uma UF</strong><small>Selecione o estado acima para comparar o template atual com o resultado calculado.</small></span></div>}
-            <div className="fiscal-mode-heading"><strong>2. ESCOLHA O MODO QUE SERÁ SALVO</strong><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={15}/> Como funciona?</button></div>
-            <div className="guided-fiscal-modes">
-              <button type="button" className={data.configuracao.modo_regras_fiscais === "desativado" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"desativado"}})}>
-                <strong>Usar somente o que marquei</strong><small>O job usa exatamente as caixas escolhidas em Comparar divergências e ignora as regras estaduais.</small>
-              </button>
-              <button type="button" className={`simulation ${data.configuracao.modo_regras_fiscais === "simulacao" ? "selected" : ""}`} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"simulacao"}})}>
-                <strong>Testar regra por estado · recomendado</strong><small>Calcula e registra no log, mas mantém no cliente as marcações manuais do template.</small>
-              </button>
-              <button type="button" className={data.configuracao.modo_regras_fiscais === "automatico" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"automatico"}})}>
-                <strong>Aplicar regra por estado</strong><small>Substitui somente os cinco campos laranja pelo resultado da UF. Os demais permanecem como você marcou.</small>
-              </button>
-            </div>
-            {data.configuracao.modo_regras_fiscais === "simulacao" && <div className="fiscal-simulation-banner"><ShieldCheck size={19}/><span><strong>SIMULAÇÃO ATIVA</strong><small>O próximo job registrará as diferenças no log, mas manterá essas cinco flags como estão. VIEW, TMP, XML e as demais configurações continuam sendo aplicados normalmente.</small></span></div>}
-            {data.configuracao.modo_regras_fiscais === "automatico" && <div className="fiscal-auto-banner"><Check size={19}/><span><strong>APLICAÇÃO AUTOMÁTICA ATIVA</strong><small>No próximo job, as cinco flags serão ajustadas conforme a UF real do CNPJ e as exceções escolhidas acima.</small></span></div>}
+              {data.configuracao.modo_regras_fiscais === "desativado" ? (
+                <div className="final-manual-summary"><Check size={22}/><span><strong>Usar conforme marquei</strong><small>O template está pronto para salvar. Todos os impostos seguirão exatamente as marcações feitas em Comparar divergências; nenhuma regra estadual ou exceção será usada.</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(5); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Mudar para regra por estado</button></div>
+              ) : <>
+                <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>{data.configuracao.modo_regras_fiscais === "simulacao" ? "Os próximos jobs apenas calcularão e registrarão o resultado no log." : "Os próximos jobs aplicarão no cliente o resultado da UF real do CNPJ."}</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(5); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Alterar modo ou exceções</button></div>
+                <label className="uf-preview-control"><span>SIMULAR VISUALMENTE UMA UF</span>
+                  <select value={previewUf} onChange={(event) => setPreviewUf(event.target.value)}>
+                    <option value="">Selecione uma UF para ver o resultado</option>
+                    {Object.keys(fiscalRules).sort().map((uf) => <option key={uf}>{uf}</option>)}
+                  </select>
+                  <small>A UF escolhida serve somente para a prévia. No job real, o worker consulta automaticamente a UF do CNPJ. <a href="/painel/regras-fiscais">Editar regras estaduais →</a></small>
+                </label>
+                {previewUf ? (
+                  <div className="fiscal-preview-ready">
+                    <div><MapPinned size={22}/><span><strong>Prévia de {previewUf} pronta</strong><small>O resultado aparece somente na grade Comparar divergências, junto dos outros impostos.</small></span></div>
+                    <div className="fiscal-preview-counts"><span><b>{fiscalPreviewMarked}</b> marcados</span><span><b>{fiscalPreview.length - fiscalPreviewMarked}</b> desmarcados</span><span><b>{fiscalPreviewChanges}</b> mudariam</span></div>
+                    <button type="button" className="fiscal-grid-preview-button" onClick={showFiscalPreviewInGrid}><MapPinned size={17}/> Ver impostos marcados na grade Comparar divergências</button>
+                    <small>Na grade, as caixas azuis são apenas uma prévia. Use “Voltar às marcações originais” para editar novamente o padrão manual.</small>
+                  </div>
+                ) : <div className="fiscal-preview-empty"><MapPinned size={22}/><span><strong>Simulação visual opcional</strong><small>Selecione um estado acima ou salve diretamente se já conferiu as regras.</small></span></div>}
+              </>}
             </div>}
           </section>
           <button className="primary-button save-bottom" id="template-final-save" onClick={save}>
