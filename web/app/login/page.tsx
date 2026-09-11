@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Download, Eye, EyeOff, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -48,6 +48,17 @@ export default function LoginPage() {
           <label>Senha<span className="password-input"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Sua senha" /><button type="button" onClick={() => setShowPassword(!showPassword)} title={showPassword ? "Ocultar senha" : "Visualizar senha"}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></span></label>
           {error && <div className="form-error">{error}</div>}
           <button className="primary-button" disabled={loading}>{loading ? "Entrando..." : <>Entrar no painel <ArrowRight size={18} /></>}</button>
+          <a
+            className="installer-download"
+            href="/downloads/Instalador-Mix-Fiscal.exe"
+            download
+          >
+            <Download size={20} />
+            <span>
+              <strong>Baixar instalador Mix Fiscal</strong>
+              <small>Instalador oficial para Windows</small>
+            </span>
+          </a>
           <small>Ao entrar, voce concorda com as politicas internas de seguranca.</small>
         </form>
       </section>

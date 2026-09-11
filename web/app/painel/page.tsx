@@ -19,6 +19,7 @@ import {
   Clock3,
   Copy,
   Database,
+  Download,
   FilePlus2,
   LayoutDashboard,
   LogOut,
@@ -797,6 +798,13 @@ export default function PainelPage() {
             )}
           </div>
           <div className="top-actions">
+            <a
+              className="secondary-action"
+              href="/downloads/Instalador-Mix-Fiscal.exe"
+              download
+            >
+              <Download size={18} /> Baixar instalador
+            </a>
             <button
               className="icon-button"
               onClick={() => void load(true)}

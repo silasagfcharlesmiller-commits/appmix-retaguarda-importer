@@ -68,6 +68,12 @@ input:focus,select:focus,textarea:focus { border-color:#4e8c75; box-shadow:0 0 0
 .login-card h2 { margin:-10px 0 -14px; font-size:2rem; letter-spacing:-.035em; }
 .login-card small { color:#89948f; text-align:center; line-height:1.5; }
 .login-icon { display:grid; place-items:center; width:52px; height:52px; border-radius:15px; color:var(--green); background:#e9f4df; }
+.installer-download { display:flex; align-items:center; gap:12px; padding:12px 14px; color:var(--green-dark); border:1px solid #cfe0d8; border-radius:12px; background:#f2f8f5; text-decoration:none; transition:.2s; }
+.installer-download:hover { border-color:#8fbea9; background:#e7f4ed; transform:translateY(-1px); }
+.installer-download>svg { flex:0 0 20px; }
+.installer-download>span { display:grid; gap:2px; text-align:left; }
+.installer-download strong { font-size:.88rem; }
+.login-card .installer-download small { color:var(--muted); text-align:left; font-size:.75rem; }
 .form-error,.notice { padding:11px 13px; border:1px solid #f1c7c4; border-radius:10px; color:#962f2b; background:#fff2f1; font-size:.87rem; }
 
 .app-shell { min-height:100vh; display:grid; grid-template-columns:250px 1fr; }
