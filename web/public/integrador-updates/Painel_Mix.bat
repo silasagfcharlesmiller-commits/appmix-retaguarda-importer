@@ -46,6 +46,9 @@ if not defined NOME_EXE set "NOME_EXE=desktop-integrador.exe"
 set "NOME_PROCESSO=%NOME_EXE:.exe=%"
 set "NOME_TAREFA=Mix Fiscal - Monitorar Integrador"
 set "NOME_TAREFA_ANTIGA=Monitor_Mix_Fiscal"
+set "TAREFA_BOOT=\MixFiscalIntegrador\BootStart"
+set "TAREFA_STARTUP=\MixFiscalIntegrador\Startup"
+set "TAREFA_WATCHDOG=\MixFiscalIntegrador\Watchdog"
 
 set "VERSAO_INSTALADA=nao informada"
 if exist "%PASTA_MIX%\integrador_version.json" for /f "usebackq delims=" %%V in (`powershell.exe -NoProfile -Command "$j=Get-Content -LiteralPath '%PASTA_MIX%\integrador_version.json' -Raw; $o=ConvertFrom-Json -InputObject $j; Write-Output $o.version"`) do set "VERSAO_INSTALADA=%%V"
@@ -119,6 +122,17 @@ if not exist "%PASTA_MIX%\atualizador_mix.ps1" (
 )
 exit /b 0
 
+:GERAR_LANCADOR
+:: A opcao 5 remove este arquivo. A opcao 2 sempre o recria para permitir
+:: instalar novamente o monitor sem precisar executar o setup outra vez.
+> "%PASTA_MIX%\run_silent.vbs" echo Set shell = CreateObject("WScript.Shell"^)
+>> "%PASTA_MIX%\run_silent.vbs" echo Set fileSystem = CreateObject("Scripting.FileSystemObject"^)
+>> "%PASTA_MIX%\run_silent.vbs" echo folder = fileSystem.GetParentFolderName(WScript.ScriptFullName^)
+>> "%PASTA_MIX%\run_silent.vbs" echo command = "powershell.exe -ExecutionPolicy Bypass -NoProfile -File """ ^& folder ^& "\monitor_mix.ps1"""
+>> "%PASTA_MIX%\run_silent.vbs" echo shell.Run command, 0, False
+if not exist "%PASTA_MIX%\run_silent.vbs" exit /b 2
+exit /b 0
+
 :INSTALAR
 cls
 echo ============================================================================
@@ -126,6 +140,14 @@ echo              INSTALANDO / ATIVANDO MONITORAMENTO AUTOMATICO
 echo ============================================================================
 echo.
 echo [1/2] Validando os componentes em: %PASTA_MIX%...
+call :GERAR_LANCADOR
+if errorlevel 1 (
+    echo ERRO: nao foi possivel criar run_silent.vbs em %PASTA_MIX%.
+    if /I "%~1"=="--install-monitor" exit /b 2
+    echo.
+    pause
+    goto MENU
+)
 call :VALIDAR_SCRIPTS
 if errorlevel 1 (
     if /I "%~1"=="--install-monitor" exit /b 2
@@ -145,13 +167,13 @@ call schtasks /create /tn "%NOME_TAREFA%" /tr "wscript.exe \"%PASTA_MIX%\run_sil
 set "RESULTADO_TAREFA=%errorLevel%"
 
 :: Reativa as tarefas nativas que o Integrador possa ter criado.
-call schtasks /change /tn "\MixFiscalIntegrador\BootStart" /enable >nul 2>&1
-call schtasks /change /tn "\MixFiscalIntegrador\Startup" /enable >nul 2>&1
-call schtasks /change /tn "\MixFiscalIntegrador\Watchdog" /enable >nul 2>&1
+call schtasks /change /tn "%TAREFA_BOOT%" /enable >nul 2>&1
+call schtasks /change /tn "%TAREFA_STARTUP%" /enable >nul 2>&1
+call schtasks /change /tn "%TAREFA_WATCHDOG%" /enable >nul 2>&1
 
 if %RESULTADO_TAREFA% equ 0 (
     echo.
-    echo SUCESSO! Monitoramento ativado para:
+    echo SUCESSO: Monitoramento ativado para:
     echo %PASTA_MIX%
     echo.
     echo As verificacoes serao invisiveis, sem piscar a tela.
@@ -188,19 +210,68 @@ goto MENU
 
 :DESINSTALAR
 cls
-call schtasks /end /tn "%NOME_TAREFA%" >nul 2>&1
-call schtasks /delete /tn "%NOME_TAREFA%" /f >nul 2>&1
-call schtasks /end /tn "%NOME_TAREFA_ANTIGA%" >nul 2>&1
-call schtasks /delete /tn "%NOME_TAREFA_ANTIGA%" /f >nul 2>&1
-call schtasks /change /tn "\MixFiscalIntegrador\BootStart" /disable >nul 2>&1
-call schtasks /change /tn "\MixFiscalIntegrador\Startup" /disable >nul 2>&1
-call schtasks /change /tn "\MixFiscalIntegrador\Watchdog" /disable >nul 2>&1
-echo Monitoramento automatico desativado com sucesso.
-echo Agora use a opcao 4 para parar o Integrador durante a manutencao.
+echo ============================================================================
+echo               DESINSTALANDO O MONITORAMENTO AUTOMATICO
+echo ============================================================================
 echo.
-if /I "%~1"=="--stop-monitor" exit /b 0
+set "FALHAS_LIMPEZA=0"
+
+call :REMOVER_TAREFA "%NOME_TAREFA%"
+if errorlevel 1 set /a FALHAS_LIMPEZA+=1
+call :REMOVER_TAREFA "%NOME_TAREFA_ANTIGA%"
+if errorlevel 1 set /a FALHAS_LIMPEZA+=1
+
+:: Estas tarefas pertencem ao Integrador. Mantemos as definicoes para que a
+:: opcao 2 consiga reativa-las sem precisar reinstalar o aplicativo.
+call schtasks /change /tn "%TAREFA_BOOT%" /disable >nul 2>&1
+call schtasks /change /tn "%TAREFA_STARTUP%" /disable >nul 2>&1
+call schtasks /change /tn "%TAREFA_WATCHDOG%" /disable >nul 2>&1
+
+call :REMOVER_ARQUIVO "%PASTA_MIX%\run_silent.vbs"
+if errorlevel 1 set /a FALHAS_LIMPEZA+=1
+
+echo.
+if "!FALHAS_LIMPEZA!"=="0" (
+    echo SUCESSO: Tarefas do monitor e arquivo VBS foram removidos.
+    echo As tarefas nativas do Integrador foram desativadas para manutencao.
+) else (
+    echo ATENCAO: !FALHAS_LIMPEZA! item^(ns^) nao puderam ser removidos.
+    echo Execute novamente como administrador e confira as mensagens acima.
+)
+echo A opcao 2 pode recriar o VBS e instalar o monitor novamente.
+echo.
+if /I "%~1"=="--stop-monitor" exit /b !FALHAS_LIMPEZA!
 pause
 goto MENU
+
+:REMOVER_TAREFA
+call schtasks /query /tn "%~1" >nul 2>&1
+if errorlevel 1 (
+    echo [OK] Tarefa ja estava ausente: %~1
+    exit /b 0
+)
+call schtasks /end /tn "%~1" >nul 2>&1
+call schtasks /delete /tn "%~1" /f >nul 2>&1
+call schtasks /query /tn "%~1" >nul 2>&1
+if not errorlevel 1 (
+    echo [ERRO] A tarefa continua no Agendador: %~1
+    exit /b 1
+)
+echo [OK] Tarefa excluida: %~1
+exit /b 0
+
+:REMOVER_ARQUIVO
+if not exist "%~1" (
+    echo [OK] Arquivo VBS ja estava ausente: %~nx1
+    exit /b 0
+)
+del /f /q "%~1" >nul 2>&1
+if exist "%~1" (
+    echo [ERRO] Nao foi possivel excluir: %~1
+    exit /b 1
+)
+echo [OK] Arquivo VBS excluido: %~nx1
+exit /b 0
 
 :STATUS
 cls

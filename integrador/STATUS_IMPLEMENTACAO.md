@@ -4,7 +4,7 @@ Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
 
 ## Candidata atual
 
-- versão: `1.2.5`;
+- versão: `1.2.6`;
 - interface: Go 1.26 + Wails 2 + HTML/CSS/JavaScript;
 - pacote: Inno Setup elevado;
 - runtime cliente: dois executáveis Go e um manifesto;
@@ -33,6 +33,8 @@ Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
 - login final, entrada em **Configurações**, segundo login quando solicitado e manutenção dessa
   tela aberta para conferência;
 - monitor instalado por `Painel_Mix.bat --install-monitor` e tarefa consultada;
+- opção 5 do Painel Mix exclui suas tarefas agendadas, remove o VBS, desativa as tarefas nativas
+  e valida a limpeza sem impedir uma reinstalação pela opção 2;
 - confirmação de CNPJ, serviço e Machine ID exato na API e espera pelo status online;
 - logs sem credenciais e indicação de ocorrências relacionadas do Microsoft Defender;
 - atualização dos cinco componentes já instalados pelo monitor.
@@ -47,8 +49,8 @@ Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
 - Inno Setup 6.7.3 gerou o pacote completo;
 - o verificador confirmou dois binários nativos e ausência de Python/PyQt/Playwright/Node;
 - a prévia do frontend foi renderizada em Edge/WebView e não apresentou cortes em 1100 × 850;
-- candidata `1.2.5` gerada pelo publicador canônico: 13.887.764 bytes;
-- SHA-256 do setup candidato: `09476BEBC5EF20F077E0214F28F508C6D686DC57D66AF91161F64FA2D22476FD`;
+- candidata `1.2.6` gerada pelo publicador canônico: 13.834.278 bytes;
+- SHA-256 do setup candidato: `25CC3B31CFA1988A61D98E06D40CF481A4D0B55FE52520BD391E283ED2557898`;
 - Microsoft Defender não encontrou ameaças no setup candidato;
 
 ## Antes de produção

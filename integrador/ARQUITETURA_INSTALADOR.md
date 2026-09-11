@@ -1,7 +1,7 @@
 # Arquitetura do Instalador do Integrador Mix Fiscal
 
 Referência técnica atualizada em **2026-09-11** para a branch
-`integrador-v1.2-go-wails`, candidata `1.2.5`. Antes de gerar ou publicar, leia também
+`integrador-v1.2-go-wails`, candidata `1.2.6`. Antes de gerar ou publicar, leia também
 [`PUBLICACAO.md`](PUBLICACAO.md) e confirme o branch e o `git status`.
 
 ## Decisão de tecnologia
@@ -194,7 +194,9 @@ No painel manual:
 - opção 2 instala ou reativa o monitor e as tarefas nativas;
 - opção 3 inicia o Integrador;
 - opção 4 para o Integrador;
-- opção 5 remove/desativa o monitor e desativa `BootStart`, `Startup` e `Watchdog`.
+- opção 5 encerra e exclui as tarefas criadas pelo monitor, remove `run_silent.vbs`, verifica a
+  limpeza e desativa `BootStart`, `Startup` e `Watchdog`. As tarefas nativas são preservadas para
+  que a opção 2 possa reativá-las; o VBS é recriado automaticamente.
 
 O monitor roda a cada cinco minutos, mantém o Integrador ativo e chama o atualizador.
 

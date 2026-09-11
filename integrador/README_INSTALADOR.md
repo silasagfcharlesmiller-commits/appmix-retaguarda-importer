@@ -69,7 +69,9 @@ Abra `Painel_Mix.bat`:
 - opção 2: instalar/reativar monitoramento;
 - opção 3: iniciar Integrador;
 - opção 4: parar Integrador;
-- opção 5: desinstalar/desativar monitoramento para manutenção.
+- opção 5: excluir as tarefas agendadas criadas pelo monitor e o `run_silent.vbs`, além de
+  desativar as tarefas nativas durante a manutenção. A opção 2 recria o arquivo e reativa o
+  monitor quando necessário.
 
 O monitor executa invisível a cada cinco minutos, mantém o Integrador ativo e verifica atualizações.
 
@@ -83,7 +85,7 @@ Para gerar uma versão, leia [`PUBLICACAO.md`](PUBLICACAO.md) e use somente:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\PUBLICAR_ATUALIZACAO.ps1 `
-  -Versao 1.2.5 `
+  -Versao 1.2.6 `
   -Executavel "C:\caminho\desktop-integrador.exe"
 ```
 

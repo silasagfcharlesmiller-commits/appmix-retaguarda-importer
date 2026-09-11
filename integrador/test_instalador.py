@@ -70,6 +70,14 @@ class InstallerTests(unittest.TestCase):
         self.assertIn(b"-ArgumentList '%~1'", panel)
         self.assertIn(b"-Wait -PassThru", panel)
         self.assertIn(b"/it /rl HIGHEST", panel)
+        self.assertIn(b":GERAR_LANCADOR", panel)
+        self.assertIn(b":REMOVER_TAREFA", panel)
+        self.assertIn(b":REMOVER_ARQUIVO", panel)
+        self.assertIn(b'del /f /q "%~1"', panel)
+        self.assertIn(b'schtasks /delete /tn "%~1" /f', panel)
+        self.assertIn(b'TAREFA_BOOT', panel)
+        self.assertIn(b'TAREFA_STARTUP', panel)
+        self.assertIn(b'TAREFA_WATCHDOG', panel)
         self.assertNotIn(b'/ru "%USERNAME%"', panel)
 
     def test_updater_covers_all_installed_components(self):
