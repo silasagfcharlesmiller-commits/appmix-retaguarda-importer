@@ -3,6 +3,13 @@
 O arquivo pronto para levar ao cliente fica em `entrega\Instalador-Mix-Fiscal.exe`.
 Ao clicar em **Instalar**, ele solicita permissão de administrador e executa o fluxo completo:
 
+Antes de autenticar ou alterar o Machine ID, a geração `1.1` compara a conta da sessão
+Windows/RDP com a conta que recebeu a elevação do UAC. Se forem diferentes, o fluxo é
+bloqueado e orienta a TI a entrar com a conta que permanecerá executando o Integrador. Também
+testa leitura, gravação e renomeação na pasta de instalação, `%APPDATA%`, `%LOCALAPPDATA%`,
+`%TEMP%` e no perfil `EBWebView`, além de confirmar o serviço do Agendador de Tarefas. Assim,
+uma restrição de perfil é encontrada antes do login e da configuração do cliente.
+
 1. copia o Integrador para a mesma pasta onde o instalador foi colocado;
 2. abre o WebView2 e faz login com os dados informados;
 3. aproveita o Machine ID que o próprio Integrador já criou;
@@ -45,6 +52,11 @@ Terminada a manutenção, use novamente a opção 2 e depois a opção 3 para in
 O painel, o script PowerShell e o log ficam junto do executável. O monitor detecta primeiro
 `desktop-integrador.exe`, aceita um arquivo renomeado que contenha `integrador` no nome e,
 quando houver somente um EXE de aplicação na pasta, aceita qualquer outro nome.
+
+A tarefa adicional usa o token interativo da conta já validada pelo setup. Ela não solicita nem
+armazena senha do Windows e não abre uma pergunta de senha invisível durante a instalação. Em
+servidores, o monitor funciona enquanto essa conta permanecer conectada; uma aplicação WebView2
+visível não deve ser executada na sessão isolada da conta `SYSTEM`.
 
 ## Atualização automática
 

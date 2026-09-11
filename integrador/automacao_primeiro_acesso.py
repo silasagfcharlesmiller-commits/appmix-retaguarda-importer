@@ -22,7 +22,8 @@ import winreg
 from cdp_browser import CdpPage
 from diagnostico_instalador import (
     InstallationDiagnostics, configure_run_as_admin, ensure_webview2,
-    is_run_as_admin_configured, probe_directory, security_protection_findings, sha256_file,
+    is_run_as_admin_configured, preflight_environment, probe_directory,
+    security_protection_findings, sha256_file,
 )
 from instalador_core import (
     InstallError, MixApi, normalize_cnpj, read_json, validate_machine_id,
@@ -44,7 +45,7 @@ def installer_directory() -> Path:
 
 TARGET_DIR = installer_directory()
 TARGET_EXE = TARGET_DIR / "desktop-integrador.exe"
-APP_SETTINGS = Path(os.environ["APPDATA"]) / "mixfiscal-integrador" / "local_settings.json"
+APP_SETTINGS = Path(os.environ.get("APPDATA") or TARGET_DIR) / "mixfiscal-integrador" / "local_settings.json"
 DEBUG_KEY = r"SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
 DEBUG_VALUE = "desktop-integrador.exe"
 DEBUG_PORT = 19327
@@ -465,6 +466,12 @@ def install(cnpj: str, username: str, password: str, *, progress: Progress = pri
     try:
         require_admin()
         diagnostics.event("administrador", "ok", "Instalador executando elevado")
+        progress("Validando conta do Windows, perfil e permissões")
+        preflight = preflight_environment(TARGET_DIR, diagnostics)
+        diagnostics.event(
+            "pré-validação", "ok", "Ambiente liberado antes da automação",
+            interactive_user=preflight["interactive_user"],
+        )
         cnpj = normalize_cnpj(cnpj)
         if not username.strip() or not password:
             raise InstallError("Informe usuário e senha do Integrador.")

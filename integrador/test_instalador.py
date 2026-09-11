@@ -10,7 +10,10 @@ from automacao_primeiro_acesso import (
     _copy_verified, find_local_machine_id, install_monitor, installer_directory,
 )
 from cdp_browser import CdpPage
-from diagnostico_instalador import InstallationDiagnostics, probe_directory, sha256_file
+from diagnostico_instalador import (
+    InstallationDiagnostics, preflight_environment, probe_directory,
+    probe_task_scheduler, sha256_file,
+)
 from instalador_core import (InstallError, MixApi, atomic_json, generate_machine_id,
                             normalize_cnpj, read_json, registration_payload, validate_machine_id)
 
@@ -36,6 +39,12 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("CdpPage", automation)
         self.assertNotIn("sync_playwright", automation)
 
+    def test_gui_blocks_install_until_environment_is_ready(self):
+        gui = (Path(__file__).parent / "instalador_gui.py").read_text(encoding="utf-8-sig")
+        self.assertIn("self.environment_ok = False", gui)
+        self.assertIn("self.button.setEnabled(enabled and self.environment_ok)", gui)
+        self.assertIn("self.environment_ok = True", gui)
+
     def test_panel_batch_has_real_lines_and_monitor_actions(self):
         panel = (Path(__file__).parent / "Painel_Mix.bat").read_bytes()
         self.assertGreater(panel.count(b"\n"), 150)
@@ -50,6 +59,8 @@ class InstallerTests(unittest.TestCase):
         self.assertIn(b"wscript.exe", panel)
         self.assertIn(b"-ArgumentList '%~1'", panel)
         self.assertIn(b"-Wait -PassThru", panel)
+        self.assertIn(b"/it /rl HIGHEST", panel)
+        self.assertNotIn(b'/ru "%USERNAME%"', panel)
 
     def test_updater_covers_all_installed_components(self):
         root = Path(__file__).parent
@@ -101,6 +112,73 @@ class InstallerTests(unittest.TestCase):
             probe_directory(target)
             self.assertEqual(list(target.glob(".mix-write-*.tmp")), [])
             self.assertEqual(list(target.glob(".mix-write-*.renamed")), [])
+
+    def test_preflight_blocks_different_interactive_and_elevated_accounts(self):
+        with tempfile.TemporaryDirectory() as temp, \
+             patch("diagnostico_instalador.os.name", "nt"), \
+             patch("diagnostico_instalador.ctypes.windll.shell32.IsUserAnAdmin", return_value=1), \
+             patch("diagnostico_instalador.windows_identities", return_value={
+                 "process_user": r"SERVIDOR\TI-ADMIN",
+                 "interactive_user": r"SERVIDOR\CLIENTE",
+                 "interactive_detected": True,
+                 "session_id": 3,
+                 "same_user": False,
+             }):
+            with self.assertRaisesRegex(InstallError, "diferente da conta informada no UAC"):
+                preflight_environment(Path(temp))
+
+    def test_install_stops_before_login_and_copy_when_preflight_fails(self):
+        from automacao_primeiro_acesso import install
+        with tempfile.TemporaryDirectory() as temp, \
+             patch("automacao_primeiro_acesso.TARGET_DIR", Path(temp)), \
+             patch("automacao_primeiro_acesso.require_admin"), \
+             patch("automacao_primeiro_acesso.preflight_environment", side_effect=InstallError("perfil bloqueado")), \
+             patch("automacao_primeiro_acesso.MixApi") as api, \
+             patch("automacao_primeiro_acesso.prepare_files") as prepare:
+            with self.assertRaisesRegex(InstallError, "perfil bloqueado"):
+                install("52703958000142", "usuario", "segredo", progress=lambda _message: None)
+        api.assert_not_called()
+        prepare.assert_not_called()
+
+    def test_preflight_validates_profile_paths_and_scheduler(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            env = {
+                "APPDATA": str(root / "roaming"),
+                "LOCALAPPDATA": str(root / "local"),
+                "TEMP": str(root / "temp"),
+            }
+            identity = {
+                "process_user": r"SERVIDOR\ROBO",
+                "interactive_user": r"SERVIDOR\ROBO",
+                "interactive_detected": True,
+                "session_id": 4,
+                "same_user": True,
+            }
+            with patch.dict("diagnostico_instalador.os.environ", env, clear=False), \
+                 patch("diagnostico_instalador.os.name", "nt"), \
+                 patch("diagnostico_instalador.ctypes.windll.shell32.IsUserAnAdmin", return_value=1), \
+                 patch("diagnostico_instalador.windows_identities", return_value=identity), \
+                 patch("diagnostico_instalador.probe_task_scheduler"):
+                report = preflight_environment(root / "integrador")
+            self.assertTrue(report["same_user"])
+            self.assertTrue((root / "roaming" / "mixfiscal-integrador").is_dir())
+            self.assertTrue((root / "roaming" / "desktop-integrador.exe" / "EBWebView").is_dir())
+            self.assertTrue((root / "local" / "MixFiscal" / "Installer").is_dir())
+
+    def test_scheduler_probe_uses_interactive_token_without_password(self):
+        completed = SimpleNamespace(returncode=0, stdout="SUCCESS", stderr="")
+        with patch("diagnostico_instalador.task_scheduler_running", return_value=True), \
+             patch("diagnostico_instalador.subprocess.run", return_value=completed) as run:
+            probe_task_scheduler()
+        create = run.call_args_list[0].args[0]
+        cleanup = run.call_args_list[1].args[0]
+        self.assertIn("/IT", create)
+        self.assertIn("HIGHEST", create)
+        self.assertNotIn("/RU", create)
+        self.assertNotIn("/RP", create)
+        self.assertIn("/Delete", cleanup)
+        self.assertIs(run.call_args_list[0].kwargs["stdin"], __import__("subprocess").DEVNULL)
 
     def test_diagnostic_writes_text_and_json_without_credentials(self):
         with tempfile.TemporaryDirectory() as temp:

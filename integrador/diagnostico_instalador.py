@@ -6,7 +6,8 @@ O módulo não lê nem registra credenciais, conteúdo de configurações ou dad
 from __future__ import annotations
 
 import ctypes
-from datetime import datetime, timezone
+from ctypes import wintypes
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
@@ -30,6 +31,107 @@ RUN_AS_ADMIN_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags
 MONITOR_TASK = "Mix Fiscal - Monitorar Integrador"
 MANIFEST_URL = "https://appmix-retaguarda-importer.vercel.app/integrador-updates/version.json"
 PUBLIC_HOST = "appmix-retaguarda-importer.vercel.app"
+
+
+def _process_identity() -> str:
+    """Retorna a conta do processo elevado no formato DOMINIO\\usuario."""
+    size = wintypes.ULONG(0)
+    ctypes.windll.secur32.GetUserNameExW(2, None, ctypes.byref(size))  # NameSamCompatible
+    if size.value:
+        buffer = ctypes.create_unicode_buffer(size.value)
+        if ctypes.windll.secur32.GetUserNameExW(2, buffer, ctypes.byref(size)):
+            return buffer.value.strip()
+    domain = os.environ.get("USERDOMAIN", "").strip()
+    username = os.environ.get("USERNAME", "").strip()
+    if username:
+        return f"{domain}\\{username}" if domain else username
+    return "conta não identificada"
+
+
+def _current_session_id() -> int:
+    session_id = wintypes.DWORD()
+    if not ctypes.windll.kernel32.ProcessIdToSessionId(os.getpid(), ctypes.byref(session_id)):
+        return -1
+    return int(session_id.value)
+
+
+def _wts_session_value(session_id: int, info_class: int) -> str:
+    buffer = wintypes.LPWSTR()
+    size = wintypes.DWORD()
+    if not ctypes.windll.wtsapi32.WTSQuerySessionInformationW(
+        None, session_id, info_class, ctypes.byref(buffer), ctypes.byref(size)
+    ):
+        return ""
+    try:
+        return str(buffer.value or "").strip()
+    finally:
+        ctypes.windll.wtsapi32.WTSFreeMemory(buffer)
+
+
+def windows_identities() -> dict:
+    """Compara a conta da sessão RDP/console com a conta que recebeu o UAC."""
+    process_user = _process_identity()
+    session_id = _current_session_id()
+    username = _wts_session_value(session_id, 5) if session_id >= 0 else ""  # WTSUserName
+    domain = _wts_session_value(session_id, 7) if session_id >= 0 else ""  # WTSDomainName
+    interactive_detected = bool(username)
+    interactive_user = f"{domain}\\{username}" if domain and username else username
+    interactive_user = interactive_user or "sessão não identificada"
+    return {
+        "process_user": process_user,
+        "interactive_user": interactive_user,
+        "interactive_detected": interactive_detected,
+        "session_id": session_id,
+        "same_user": interactive_detected and process_user.casefold() == interactive_user.casefold(),
+    }
+
+
+def task_scheduler_running() -> bool:
+    command = (
+        "$service=Get-Service -Name Schedule -ErrorAction Stop;"
+        "if($service.Status -eq [System.ServiceProcess.ServiceControllerStatus]::Running)"
+        "{exit 0}else{exit 1}"
+    )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
+        check=False, capture_output=True,
+        text=True, encoding="utf-8", errors="replace",
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    return result.returncode == 0
+
+
+def probe_task_scheduler() -> None:
+    """Cria e remove uma tarefa inofensiva para confirmar a permissão efetiva."""
+    if not task_scheduler_running():
+        raise InstallError(
+            "O Agendador de Tarefas do Windows não está em execução ou foi bloqueado pela TI."
+        )
+    task_name = f"Mix Fiscal - Teste Permissao {uuid.uuid4().hex}"
+    start = (datetime.now() + timedelta(minutes=10)).strftime("%H:%M")
+    command = [
+        "schtasks.exe", "/Create", "/TN", task_name,
+        "/TR", "cmd.exe /c exit 0", "/SC", "ONCE", "/ST", start,
+        "/IT", "/RL", "HIGHEST", "/F",
+    ]
+    try:
+        result = subprocess.run(
+            command, check=False, capture_output=True, stdin=subprocess.DEVNULL,
+            text=True, encoding="utf-8", errors="replace",
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        if result.returncode:
+            detail = _safe_text((result.stdout or "") + " " + (result.stderr or ""), 240)
+            raise InstallError(
+                "A conta elevada não conseguiu criar uma tarefa interativa no Agendador. "
+                f"Retorno do Windows: {detail or result.returncode}."
+            )
+    finally:
+        subprocess.run(
+            ["schtasks.exe", "/Delete", "/TN", task_name, "/F"], check=False,
+            capture_output=True, stdin=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
 
 
 def sha256_file(path: Path) -> str:
@@ -131,12 +233,17 @@ class InstallationDiagnostics:
 
 
 def system_information() -> dict:
+    identities = windows_identities() if os.name == "nt" else {
+        "process_user": "não aplicável", "interactive_user": "não aplicável",
+        "interactive_detected": True, "session_id": -1, "same_user": True,
+    }
     return {
         "computer": platform.node(),
         "windows": platform.platform(),
         "architecture": platform.machine(),
         "python_frozen": bool(getattr(__import__("sys"), "frozen", False)),
         "administrator": bool(os.name == "nt" and ctypes.windll.shell32.IsUserAnAdmin()),
+        **identities,
     }
 
 
@@ -160,6 +267,77 @@ def probe_directory(path: Path) -> None:
             f"O Windows não permitiu gravar e executar a instalação em {path}. "
             "Consulte o diagnóstico ou solicite a liberação da pasta para a TI."
         ) from exc
+
+
+def preflight_environment(
+    target_dir: Path, diagnostics: InstallationDiagnostics | None = None
+) -> dict:
+    """Valida o perfil que realmente executará o Integrador antes da automação."""
+    if os.name != "nt" or not ctypes.windll.shell32.IsUserAnAdmin():
+        raise InstallError("Execute o instalador como administrador.")
+
+    identities = windows_identities()
+    if diagnostics:
+        diagnostics.event(
+            "contas", "ok" if identities["same_user"] else "erro",
+            "Conta interativa e conta elevada identificadas",
+            interactive_user=identities["interactive_user"],
+            process_user=identities["process_user"],
+            session_id=identities["session_id"],
+        )
+    if not identities.get("interactive_detected", True):
+        raise InstallError(
+            "O Windows não informou qual conta está conectada nesta sessão. "
+            "A TI precisa executar o setup dentro da sessão RDP/console que ficará com o robô."
+        )
+    if not identities["same_user"]:
+        raise InstallError(
+            "O usuário conectado ao Windows é diferente da conta informada no UAC. "
+            f"Sessão: {identities['interactive_user']}. Elevação: {identities['process_user']}. "
+            "Entre no servidor com a conta que ficará executando o Integrador e execute o "
+            "instalador novamente. Nenhum login ou Machine ID foi alterado."
+        )
+
+    required_env = {
+        "AppData": os.environ.get("APPDATA", ""),
+        "LocalAppData": os.environ.get("LOCALAPPDATA", ""),
+        "TEMP": os.environ.get("TEMP", "") or tempfile.gettempdir(),
+    }
+    missing = [name for name, value in required_env.items() if not str(value).strip()]
+    if missing:
+        raise InstallError(
+            "O perfil do Windows não informou os caminhos obrigatórios: " + ", ".join(missing) + "."
+        )
+
+    paths = {
+        "install_dir": target_dir.resolve(),
+        "temp": Path(required_env["TEMP"]).resolve(),
+        "settings": Path(required_env["AppData"]) / "mixfiscal-integrador",
+        "webview_profile": Path(required_env["AppData"]) / "desktop-integrador.exe" / "EBWebView",
+        "local_profile": Path(required_env["LocalAppData"]) / "MixFiscal" / "Installer",
+    }
+    for name, path in paths.items():
+        try:
+            probe_directory(path)
+        except InstallError as exc:
+            if diagnostics:
+                diagnostics.event("perfil", "erro", str(exc), area=name, path=path)
+            raise InstallError(
+                f"A conta {identities['interactive_user']} não consegue preparar {name} em {path}. "
+                "A TI precisa liberar leitura, gravação, criação e renomeação nesse caminho."
+            ) from exc
+        if diagnostics:
+            diagnostics.event("perfil", "ok", "Leitura e gravação confirmadas", area=name, path=path)
+
+    try:
+        probe_task_scheduler()
+    except InstallError as exc:
+        if diagnostics:
+            diagnostics.event("agendador", "erro", str(exc))
+        raise
+    if diagnostics:
+        diagnostics.event("agendador", "ok", "Serviço Schedule em execução")
+    return {**identities, "paths": {name: str(path) for name, path in paths.items()}}
 
 
 def webview2_version() -> str:
@@ -428,6 +606,7 @@ def security_protection_findings(target_dir: Path) -> list[dict]:
 
 
 def environment_report(target_dir: Path, bundled_version: str = "", check_remote: bool = True) -> dict:
+    preflight = preflight_environment(target_dir)
     target = target_dir / "desktop-integrador.exe"
     installed_release = "não instalado"
     version_file = target_dir / "integrador_version.json"
@@ -446,6 +625,10 @@ def environment_report(target_dir: Path, bundled_version: str = "", check_remote
         "run_as_admin": "configurado" if is_run_as_admin_configured(target) else "não configurado",
         "target_dir": str(target_dir),
         "security_findings": len(security_protection_findings(target_dir)),
+        "interactive_user": preflight["interactive_user"],
+        "process_user": preflight["process_user"],
+        "profile_ready": True,
+        "task_scheduler": "disponível",
     }
     if check_remote:
         try:

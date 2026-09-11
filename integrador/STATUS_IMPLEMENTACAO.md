@@ -60,6 +60,12 @@ geração conseguem baixar, validar e abrir uma versão superior mantendo a past
 original. O diagnóstico registra ocorrências relacionadas encontradas no Microsoft Defender
 e gera informações para a TI sem alterar ou desativar a proteção da máquina.
 
+O pré-diagnóstico agora identifica a conta interativa da sessão RDP/console e a conta elevada.
+Quando o técnico fornece no UAC uma conta diferente daquela que executará o robô, a automação é
+bloqueada antes do login e da identidade do cliente. O setup testa os diretórios do perfil usados
+pelo Integrador e pelo WebView2, o diretório temporário, a pasta final e o serviço do Agendador.
+O Painel Mix cria o monitor com token interativo, sem `/RU` e sem solicitar uma senha invisível.
+
 Após um antivírus bloquear a extração do pacote anterior, a geração foi trocada de PyInstaller
 `onefile` para aplicação interna `onedir` embalada pelo Inno Setup. A automação deixou de usar
 Playwright e passou a acessar diretamente o protocolo local do WebView2 por WebSocket. Com isso,
@@ -67,10 +73,10 @@ o `node.exe` de aproximadamente 92 MB foi removido e o setup caiu de cerca de 91
 
 ## Validações
 
-- 21 testes locais passaram, incluindo diagnóstico, integridade e proteção contra retorno ao `onefile`;
+- 26 testes locais passaram, incluindo diagnóstico de contas/perfil, integridade e proteção contra retorno ao `onefile`;
 - os cinco arquivos Python principais compilam com `py_compile`;
 - o pacote contém `desktop-integrador.exe`, `Painel_Mix.bat`, `atualizador_mix.ps1`,
-  `monitor_mix.ps1`, `run_silent.vbs`, `integrador_version.json` e o driver Playwright;
+  `monitor_mix.ps1`, `run_silent.vbs`, `integrador_version.json` e o cliente CDP/WebSocket;
 - o runtime interno possui 11 entradas CArchive e nenhum arquivo do Playwright/Node;
 - a instalação silenciosa de validação terminou com código `0`, criou os 156 arquivos esperados
   e respeitou o destino solicitado;

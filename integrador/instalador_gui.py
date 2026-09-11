@@ -189,6 +189,7 @@ class InstallerWindow(QWidget):
         super().__init__()
         self.worker = None
         self.diagnostic_worker = None
+        self.environment_ok = False
         self.password_visible = False
         self.setObjectName("root")
         self.setWindowTitle(f"Mix Fiscal | Instalador do Integrador v{APP_VERSION}")
@@ -352,6 +353,7 @@ class InstallerWindow(QWidget):
         self.button.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.button.clicked.connect(self.start)
+        self.button.setEnabled(False)
         layout.addWidget(self.button)
         return card
 
@@ -368,7 +370,7 @@ class InstallerWindow(QWidget):
         self.username.setEnabled(enabled)
         self.password.setEnabled(enabled)
         self.eye.setEnabled(enabled)
-        self.button.setEnabled(enabled)
+        self.button.setEnabled(enabled and self.environment_ok)
         self.check_button.setEnabled(enabled)
 
     def check_environment(self):
@@ -376,12 +378,15 @@ class InstallerWindow(QWidget):
             return
         self.check_button.setEnabled(False)
         self.check_button.setText("Verificando...")
+        self.environment_ok = False
+        self.button.setEnabled(False)
         self.diagnostic_worker = DiagnosticWorker()
         self.diagnostic_worker.succeeded.connect(self.environment_ready)
         self.diagnostic_worker.failed.connect(self.environment_failed)
         self.diagnostic_worker.start()
 
     def environment_ready(self, report: dict):
+        self.environment_ok = True
         available = report.get("available_version", "indisponível")
         update = " • atualização disponível" if report.get("update_available") else ""
         self.versions.setText(
@@ -390,19 +395,26 @@ class InstallerWindow(QWidget):
             f"Painel BAT: {report['panel_version']}\n"
             f"WebView2: {report['webview2_version']}  |  "
             f"Monitor: {report['monitor']}  |  Administrador: {report['run_as_admin']}  |  "
-            f"Proteção: {report['security_findings']} ocorrência(s)"
+            f"Proteção: {report['security_findings']} ocorrência(s)\n"
+            f"Conta ativa: {report['interactive_user']}  |  Perfil: liberado  |  Agendador: disponível"
         )
         self.check_button.setText("Verificar novamente")
         self.check_button.setEnabled(True)
+        self.button.setEnabled(True)
 
     def environment_failed(self, message: str):
+        self.environment_ok = False
         self.versions.setText("Não foi possível concluir a verificação. Consulte o diagnóstico.")
         self.check_button.setText("Tentar novamente")
         self.check_button.setEnabled(True)
+        self.button.setEnabled(False)
         QMessageBox.warning(self, "Verificação do ambiente", message)
 
     def start(self):
         if self.worker and self.worker.isRunning():
+            return
+        if not self.environment_ok:
+            self.check_environment()
             return
         self.set_form_enabled(False)
         self.bar.setRange(0, 0)

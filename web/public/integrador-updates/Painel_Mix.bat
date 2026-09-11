@@ -139,7 +139,9 @@ call schtasks /end /tn "%NOME_TAREFA%" >nul 2>&1
 call schtasks /delete /tn "%NOME_TAREFA%" /f >nul 2>&1
 call schtasks /end /tn "%NOME_TAREFA_ANTIGA%" >nul 2>&1
 call schtasks /delete /tn "%NOME_TAREFA_ANTIGA%" /f >nul 2>&1
-call schtasks /create /tn "%NOME_TAREFA%" /tr "wscript.exe \"%PASTA_MIX%\run_silent.vbs\"" /sc minute /mo 5 /ru "%USERNAME%" /rl HIGHEST /f
+:: A conta ja foi validada pelo setup. /IT usa o token da sessao conectada e
+:: evita pedir uma senha invisivel dentro do instalador.
+call schtasks /create /tn "%NOME_TAREFA%" /tr "wscript.exe \"%PASTA_MIX%\run_silent.vbs\"" /sc minute /mo 5 /it /rl HIGHEST /f
 set "RESULTADO_TAREFA=%errorLevel%"
 
 :: Reativa as tarefas nativas que o Integrador possa ter criado.
