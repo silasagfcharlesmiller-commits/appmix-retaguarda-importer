@@ -21,7 +21,7 @@ import {
 
 type Meta = { id: number; nome: string };
 type WizardMode = "copy" | "blank";
-type GuidedStep = 0 | 1 | 2 | 3 | 4 | 5;
+type GuidedStep = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 type Fields = {
   view_nome: string;
   view_sql: string;
@@ -105,42 +105,64 @@ const taxes = [
 ];
 const guidedSetupSteps = [
   {
+    shortTitle: "VIEW/TMP",
     title: "Tabelas VIEW e TMP",
     description: "Revise os quatro grupos fiscais. Informe nomes, consultas e regras de gravação usadas por esta configuração.",
     target: "template-tables",
     optional: false,
   },
   {
+    shortTitle: "Divergências",
     title: "Comparar divergências",
-    description: "Escolha os campos monitorados e defina como as regras fiscais por UF devem se comportar.",
+    description: "Escolha os campos que o robô deve comparar. As regras por UF serão revisadas somente no final.",
     target: "comparar-divergencia",
     optional: true,
   },
   {
+    shortTitle: "XML",
     title: "Padrão XML",
     description: "Adicione pastas ou consultas SQL somente quando este template também configurar a captura de XML.",
     target: "template-xml",
     optional: true,
   },
   {
+    shortTitle: "Scheduler",
     title: "Scheduler",
     description: "Programe comandos automáticos por Machine ID. Deixe sem comando quando não precisar de agendamento.",
     target: "template-scheduler",
     optional: true,
   },
   {
+    shortTitle: "Conexão",
     title: "Dados de conexão",
-    description: "Cadastre banco, usuário e senha somente quando o template também instalar a conexão do robô.",
+    description: "Opcional e exclusivo por template. Cadastre banco, usuário e senha somente quando o robô precisar dessa conexão.",
     target: "template-connection",
     optional: true,
   },
   {
-    title: "Revisar e salvar",
-    description: "Confira o resumo e salve todas as alterações do novo template.",
-    target: "template-final-save",
+    shortTitle: "Exceções",
+    title: "Exceções do template",
+    description: "Opcional. Defina somente os campos que devem contrariar a regra estadual; os demais continuam seguindo a UF.",
+    target: "template-fiscal-overrides",
+    optional: true,
+  },
+  {
+    shortTitle: "Simular",
+    title: "Simular e finalizar",
+    description: "Escolha uma UF, veja exatamente como as cinco flags ficariam e só então defina o modo de aplicação e salve.",
+    target: "template-fiscal-simulation",
     optional: false,
   },
 ] as const;
+const specificTaxRegimes = ["lucro_real", "lucro_presumido", "simples_nacional"] as const;
+function normalizeTaxRegimes(regimes: unknown): string[] {
+  if (!Array.isArray(regimes)) return ["qualquer"];
+  const selected = regimes.filter((regime): regime is string => typeof regime === "string");
+  if (selected.includes("qualquer") || specificTaxRegimes.every((regime) => selected.includes(regime)))
+    return ["qualquer"];
+  const valid = selected.filter((regime) => specificTaxRegimes.includes(regime as typeof specificTaxRegimes[number]));
+  return valid.length ? [...new Set(valid)] : ["qualquer"];
+}
 const blank = (): Fields => ({
   view_nome: "",
   view_sql: "",
@@ -326,6 +348,21 @@ function getDeep(obj: Record<string, unknown>, path: string) {
     true
   );
 }
+function buildFiscalPreview(data: Data, rules: FiscalRules, uf: string) {
+  return Object.entries(managedFiscalFields).map(([path, field]) => {
+    const current = getDeep(data.comparar_divergencia, path);
+    const exception = data.configuracao.excecoes_regras_fiscais[field] || "herdar";
+    const stateRule = rules[uf]?.[field] || "herdar";
+    const behavior = exception !== "herdar" ? exception : stateRule;
+    return {
+      field,
+      label: fiscalFieldLabels[field],
+      current,
+      result: behavior === "aplicar" ? true : behavior === "desativar" ? false : current,
+      origin: exception !== "herdar" ? "Exceção do template" : stateRule !== "herdar" ? `Regra de ${uf}` : "Valor do template",
+    };
+  });
+}
 function setDeep(obj: Record<string, unknown>, path: string, value: boolean) {
   const keys = path.split(".");
   let cur = obj;
@@ -378,6 +415,7 @@ export default function TemplatesPage() {
     [wizardCreating, setWizardCreating] = useState(false),
     [wizardError, setWizardError] = useState("");
   const [guidedStep, setGuidedStep] = useState<GuidedStep | null>(null);
+  const fiscalPreview = data && previewUf ? buildFiscalPreview(data, fiscalRules, previewUf) : [];
   async function list(select?: number) {
     const r = await fetch("/api/mix/v1/templates");
     const j = await r.json();
@@ -425,10 +463,9 @@ export default function TemplatesPage() {
         const legacy = j.dados?.configuracao?.regime_tributario;
         setData({
           configuracao: {
-            regimes_tributarios:
-              Array.isArray(saved) && saved.length
-                ? saved
-                : [legacy || "qualquer"],
+            regimes_tributarios: normalizeTaxRegimes(
+              Array.isArray(saved) && saved.length ? saved : [legacy || "qualquer"],
+            ),
             descricao: String(j.dados?.configuracao?.descricao || ""),
             modo_regras_fiscais: ["automatico", "simulacao"].includes(j.dados?.configuracao?.modo_regras_fiscais)
               ? j.dados.configuracao.modo_regras_fiscais
@@ -514,7 +551,7 @@ export default function TemplatesPage() {
           ...current,
           configuracao: {
             ...current.configuracao,
-            regimes_tributarios: checked ? ["qualquer"] : ["lucro_real"],
+            regimes_tributarios: ["qualquer"],
           },
         };
       const base = current.configuracao.regimes_tributarios.filter(
@@ -527,7 +564,7 @@ export default function TemplatesPage() {
         ...current,
         configuracao: {
           ...current.configuracao,
-          regimes_tributarios: next.length ? next : ["qualquer"],
+          regimes_tributarios: normalizeTaxRegimes(next),
         },
       };
     });
@@ -573,14 +610,14 @@ export default function TemplatesPage() {
   }
   function toggleWizardRegime(regime: string, checked: boolean) {
     if (regime === "qualquer") {
-      setWizardRegimes(checked ? ["qualquer"] : ["lucro_real"]);
+      setWizardRegimes(["qualquer"]);
       return;
     }
     const base = wizardRegimes.filter((item) => item !== "qualquer");
     const next = checked
       ? [...new Set([...base, regime])]
       : base.filter((item) => item !== regime);
-    setWizardRegimes(next.length ? next : ["qualquer"]);
+    setWizardRegimes(normalizeTaxRegimes(next));
   }
   async function createFromWizard() {
     const nome = wizardName.trim();
@@ -875,7 +912,7 @@ export default function TemplatesPage() {
                     <article><small>Regime</small><strong>{wizardRegimes.includes("qualquer") ? "Todos" : wizardRegimes.map((item) => item === "lucro_real" ? "Lucro Real" : item === "lucro_presumido" ? "Lucro Presumido" : "Simples Nacional").join(", ")}</strong></article>
                     {wizardDescription.trim() && <article className="wide"><small>Descrição</small><strong>{wizardDescription.trim()}</strong></article>}
                   </div>
-                  <div className="wizard-next-note"><ArrowRight size={18}/><span><strong>O guia continuará após a criação</strong><small>Você passará por VIEW/TMP, divergências, XML, scheduler, conexão e revisão final. As etapas opcionais podem ficar vazias.</small></span></div>
+                  <div className="wizard-next-note"><ArrowRight size={18}/><span><strong>O guia continuará após a criação</strong><small>Você passará por VIEW/TMP, divergências, XML, scheduler, conexão, exceções e uma simulação final. As etapas opcionais podem ficar vazias.</small></span></div>
                 </section>
               )}
 
@@ -886,8 +923,14 @@ export default function TemplatesPage() {
               <button type="button" className="wizard-cancel" onClick={wizardStep === 1 ? closeWizard : () => { setWizardError(""); setWizardStep(wizardStep - 1); }} disabled={wizardCreating}>
                 {wizardStep === 1 ? "Cancelar" : <><ArrowLeft size={17}/> Voltar</>}
               </button>
-              <button type="submit" className="primary-button compact" disabled={wizardCreating || (wizardStep === 1 && wizardMode === "copy" && !wizardSource) || (wizardStep === 2 && wizardName.trim().length < 2)}>
-                {wizardCreating ? "Criando..." : wizardStep === 3 ? <><Check size={17}/> Criar e abrir editor</> : <>Continuar <ArrowRight size={17}/></>}
+              <button
+                type="submit"
+                className={`primary-button compact ${wizardCreating ? "is-loading" : ""}`}
+                aria-busy={wizardCreating}
+                disabled={wizardCreating || (wizardStep === 1 && wizardMode === "copy" && !wizardSource) || (wizardStep === 2 && wizardName.trim().length < 2)}
+                title={wizardStep === 2 && wizardName.trim().length < 2 ? "Informe o nome do template para continuar" : undefined}
+              >
+                {wizardCreating ? "Criando..." : wizardStep === 2 && wizardName.trim().length < 2 ? <>Informe o nome</> : wizardStep === 3 ? <><Check size={17}/> Criar e abrir editor</> : <>Continuar <ArrowRight size={17}/></>}
               </button>
             </footer>
           </form>
@@ -1048,42 +1091,6 @@ export default function TemplatesPage() {
                   : "O worker confere o regime antes de executar. Cliente fora da lista fica bloqueado para confirmação antes de qualquer alteração."}</p>
               </div>
             </div>
-            <div className="fiscal-mode-heading"><strong>REGRAS FISCAIS POR UF</strong><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={15}/> Como funciona?</button></div>
-            <label>Modo de aplicação
-              <select value={data.configuracao.modo_regras_fiscais} onChange={(event) => setData((current) => current ? ({ ...current, configuracao: { ...current.configuracao, modo_regras_fiscais: event.target.value as Data["configuracao"]["modo_regras_fiscais"] } }) : current)}>
-                <option value="desativado">Não aplicar — manter o template</option>
-                <option value="simulacao">Simulação — calcular e registrar sem aplicar regras da UF</option>
-                <option value="automatico">Aplicar automaticamente</option>
-              </select>
-              <small>O worker consulta a UF de cada CNPJ. Use Simulação para conferir no log quais regras estaduais seriam alteradas.</small>
-            </label>
-            {data.configuracao.modo_regras_fiscais === "simulacao" && <div className="fiscal-simulation-banner"><ShieldCheck size={19}/><span><strong>SIMULAÇÃO ATIVA</strong><small>As regras automáticas da UF serão calculadas e registradas no log, mas não substituirão os campos deste template. As demais configurações escolhidas continuam sendo aplicadas normalmente.</small></span></div>}
-            {data.configuracao.modo_regras_fiscais !== "desativado" && <label className="uf-preview-control"><span>PRÉ-VISUALIZAR REGRAS POR UF</span>
-              <select value={previewUf} onChange={(event) => {
-                const uf = event.target.value;
-                setPreviewUf(uf);
-                if (!uf) return;
-                setDivergenceOpen(true);
-                setOpenMasters(["saida"]);
-                setTimeout(() => document.getElementById("divergencia-saida")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-              }}>
-                <option value="">Escolha uma UF para visualizar</option>
-                {Object.keys(fiscalRules).sort().map((uf) => <option key={uf}>{uf}</option>)}
-              </select><small>Somente visual: não salva uma UF no template. No job, o worker usa a UF real consultada pelo CNPJ. <a href="/painel/regras-fiscais">Adicionar ou remover estados em Regras por UF →</a></small>
-            </label>}
-            {data.configuracao.modo_regras_fiscais !== "desativado" && <section className="template-fiscal-overrides">
-              <div><strong>EXCEÇÕES DESTE TEMPLATE</strong><small>Use somente quando esta retaguarda precisar contrariar a regra estadual. “Seguir regra da UF” é o padrão seguro.</small></div>
-              <div className="template-fiscal-override-grid">
-                {Object.entries(fiscalFieldLabels).map(([field, label]) => <label key={field}><span>{label}</span>
-                  <select value={data.configuracao.excecoes_regras_fiscais[field] || "herdar"} onChange={(event) => setData((current) => current ? ({...current, configuracao:{...current.configuracao, excecoes_regras_fiscais:{...current.configuracao.excecoes_regras_fiscais, [field]:event.target.value as FiscalBehavior}}}) : current)}>
-                    <option value="herdar">Seguir regra da UF</option>
-                    <option value="aplicar">Sempre marcado</option>
-                    <option value="desativar">Sempre desmarcado</option>
-                  </select>
-                </label>)}
-              </div>
-              <p><strong>Exemplo HSF:</strong> selecione “Sempre desmarcado” em FECP e FECP-ST. Os outros impostos continuarão seguindo normalmente o estado do CNPJ.</p>
-            </section>}
           </div>
         )}
         <div className="rule-hint variable-shortcuts">
@@ -1119,22 +1126,22 @@ export default function TemplatesPage() {
             </div>
             <button type="button" onClick={() => setGuidedStep(null)}><X size={16}/> Encerrar guia</button>
           </div>
+          <nav className="guided-step-navigation" aria-label="Navegação das etapas">
+            {guidedSetupSteps.map((step, index) => (
+              <button
+                type="button"
+                key={step.title}
+                className={index === guidedStep ? "current" : index < guidedStep ? "done" : ""}
+                onClick={() => setGuidedStep(index as GuidedStep)}
+                title={step.title}
+              >
+                <b>{index < guidedStep ? <Check size={13}/> : index + 1}</b>
+                <span>{step.shortTitle}</span>
+              </button>
+            ))}
+          </nav>
 
-          {guidedStep === 1 && (
-            <div className="guided-fiscal-modes">
-              <button type="button" className={data.configuracao.modo_regras_fiscais === "desativado" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"desativado"}})}>
-                <strong>Manter o template</strong><small>Usa somente as marcações salvas neste template.</small>
-              </button>
-              <button type="button" className={`simulation ${data.configuracao.modo_regras_fiscais === "simulacao" ? "selected" : ""}`} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"simulacao"}})}>
-                <strong>Simulação</strong><small>Mostra no log as mudanças da UF sem aplicá-las. Recomendado no primeiro teste.</small>
-              </button>
-              <button type="button" className={data.configuracao.modo_regras_fiscais === "automatico" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"automatico"}})}>
-                <strong>Aplicar automaticamente</strong><small>Substitui as cinco flags controladas conforme a UF do CNPJ.</small>
-              </button>
-            </div>
-          )}
-
-          {guidedStep === 5 && (
+          {guidedStep === 6 && (
             <div className="guided-final-summary">
               <span><b>{Object.values(data.tabelas).filter((table) => table.view_nome || table.tmp_nome).length}</b><small>grupos VIEW/TMP preenchidos</small></span>
               <span><b>{countEnabled(data.comparar_divergencia)}</b><small>campos de divergência marcados</small></span>
@@ -1145,9 +1152,6 @@ export default function TemplatesPage() {
           )}
 
           <div className="guided-setup-footer">
-            <div className="guided-step-dots">
-              {guidedSetupSteps.map((step, index) => <button type="button" key={step.title} className={index === guidedStep ? "current" : index < guidedStep ? "done" : ""} onClick={() => setGuidedStep(index as GuidedStep)} title={step.title}>{index + 1}</button>)}
-            </div>
             <div>
               {guidedStep > 0 && <button type="button" className="wizard-cancel" onClick={() => setGuidedStep((guidedStep - 1) as GuidedStep)}><ArrowLeft size={16}/> Voltar</button>}
               {guidedStep < guidedSetupSteps.length - 1 ? (
@@ -1426,7 +1430,7 @@ export default function TemplatesPage() {
               <div>
                 <span className="eyebrow dark">DADOS DE CONEXAO</span>
                 <h2>Conexao do Integrador</h2>
-                <p>Mesmo formato do App Mix; a senha permanece criptografada.</p>
+                <p>Dados exclusivos deste template; a senha permanece criptografada e não é copiada para outro template.</p>
               </div>
               {connectionOpen ? <ChevronUp /> : <ChevronDown />}
             </button>
@@ -1471,6 +1475,77 @@ export default function TemplatesPage() {
                 </div>
               </div>
             )}
+          </section>
+          <section className="divergence-card fiscal-exceptions-card" id="template-fiscal-overrides">
+            <div className="fiscal-section-heading">
+              <div>
+                <span className="eyebrow dark">ETAPA OPCIONAL</span>
+                <h2>Exceções deste template</h2>
+                <p>Altere somente quando este template precisar contrariar a regra da UF. Se estiver em dúvida, mantenha todos como “Seguir regra da UF”.</p>
+              </div>
+              <button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={16}/> Ver explicação</button>
+            </div>
+            <div className="exception-flow-help">
+              <span><b>Regra da UF</b><small>É o comportamento padrão.</small></span>
+              <ArrowRight size={18}/>
+              <span><b>Exceção do template</b><small>Tem prioridade apenas se você escolher marcado ou desmarcado.</small></span>
+            </div>
+            <div className="template-fiscal-override-grid">
+              {Object.entries(fiscalFieldLabels).map(([field, label]) => (
+                <label key={field} className={(data.configuracao.excecoes_regras_fiscais[field] || "herdar") !== "herdar" ? "has-exception" : ""}>
+                  <span>{label}</span>
+                  <select value={data.configuracao.excecoes_regras_fiscais[field] || "herdar"} onChange={(event) => setData((current) => current ? ({...current, configuracao:{...current.configuracao, excecoes_regras_fiscais:{...current.configuracao.excecoes_regras_fiscais, [field]:event.target.value as FiscalBehavior}}}) : current)}>
+                    <option value="herdar">Seguir regra da UF (recomendado)</option>
+                    <option value="aplicar">Sempre marcado neste template</option>
+                    <option value="desativar">Sempre desmarcado neste template</option>
+                  </select>
+                </label>
+              ))}
+            </div>
+            <p className="exception-example"><strong>Exemplo:</strong> se FECP estiver como “Sempre desmarcado”, essa escolha vence a regra estadual somente neste template. Os outros quatro campos continuam seguindo a UF.</p>
+          </section>
+          <section className="divergence-card fiscal-simulation-card" id="template-fiscal-simulation">
+            <div className="fiscal-section-heading">
+              <div>
+                <span className="eyebrow orange">ÚLTIMA ETAPA</span>
+                <h2>Simule antes de salvar</h2>
+                <p>Escolha uma UF para conferir as cinco flags controladas. Esta prévia não grava a UF no template.</p>
+              </div>
+            </div>
+            <label className="uf-preview-control"><span>1. ESCOLHA A UF DA SIMULAÇÃO</span>
+              <select value={previewUf} onChange={(event) => setPreviewUf(event.target.value)}>
+                <option value="">Selecione uma UF para ver o resultado</option>
+                {Object.keys(fiscalRules).sort().map((uf) => <option key={uf}>{uf}</option>)}
+              </select>
+              <small>No job real, o worker consulta automaticamente a UF do CNPJ. <a href="/painel/regras-fiscais">Editar regras estaduais →</a></small>
+            </label>
+            {previewUf ? (
+              <div className="fiscal-preview-table">
+                <div className="fiscal-preview-header"><span>Flag fiscal</span><span>Template</span><span>Resultado em {previewUf}</span><span>Origem</span></div>
+                {fiscalPreview.map((item) => (
+                  <div key={item.field} className={item.current !== item.result ? "will-change" : ""}>
+                    <strong>{item.label}</strong>
+                    <span>{item.current ? "Marcado" : "Desmarcado"}</span>
+                    <span><b>{item.result ? "Marcado" : "Desmarcado"}</b>{item.current !== item.result && <em>Vai mudar</em>}</span>
+                    <small>{item.origin}</small>
+                  </div>
+                ))}
+              </div>
+            ) : <div className="fiscal-preview-empty"><MapPinned size={22}/><span><strong>Aguardando uma UF</strong><small>Selecione o estado acima para comparar o template atual com o resultado calculado.</small></span></div>}
+            <div className="fiscal-mode-heading"><strong>2. ESCOLHA O MODO QUE SERÁ SALVO</strong><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={15}/> Como funciona?</button></div>
+            <div className="guided-fiscal-modes">
+              <button type="button" className={data.configuracao.modo_regras_fiscais === "desativado" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"desativado"}})}>
+                <strong>Manter o template</strong><small>Ignora as regras da UF e usa as marcações atuais.</small>
+              </button>
+              <button type="button" className={`simulation ${data.configuracao.modo_regras_fiscais === "simulacao" ? "selected" : ""}`} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"simulacao"}})}>
+                <strong>Simulação · recomendado</strong><small>Registra no log o que mudaria, sem aplicar as cinco alterações estaduais.</small>
+              </button>
+              <button type="button" className={data.configuracao.modo_regras_fiscais === "automatico" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"automatico"}})}>
+                <strong>Aplicar automaticamente</strong><small>Aplica o resultado da UF e as exceções deste template.</small>
+              </button>
+            </div>
+            {data.configuracao.modo_regras_fiscais === "simulacao" && <div className="fiscal-simulation-banner"><ShieldCheck size={19}/><span><strong>SIMULAÇÃO ATIVA</strong><small>O próximo job registrará as diferenças no log, mas manterá essas cinco flags como estão. VIEW, TMP, XML e as demais configurações continuam sendo aplicados normalmente.</small></span></div>}
+            {data.configuracao.modo_regras_fiscais === "automatico" && <div className="fiscal-auto-banner"><Check size={19}/><span><strong>APLICAÇÃO AUTOMÁTICA ATIVA</strong><small>No próximo job, as cinco flags serão ajustadas conforme a UF real do CNPJ e as exceções escolhidas acima.</small></span></div>}
           </section>
           <button className="primary-button save-bottom" id="template-final-save" onClick={save}>
             <Check size={18} /> Salvar todas as alterações
