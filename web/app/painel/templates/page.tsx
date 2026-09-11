@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  ArrowRight,
   Check,
   ChevronDown,
   ChevronUp,
@@ -15,9 +16,11 @@ import {
   Sparkles,
   Trash2,
   MapPinned,
+  X,
 } from "lucide-react";
 
 type Meta = { id: number; nome: string };
+type WizardMode = "copy" | "blank";
 type Fields = {
   view_nome: string;
   view_sql: string;
@@ -63,6 +66,7 @@ const blankConnection = (): RetaguardaConnection => ({
 type Data = {
   configuracao: {
     regimes_tributarios: string[]; descricao: string;
+    retaguarda: string;
     modo_regras_fiscais: "desativado" | "automatico";
     excecoes_regras_fiscais: Record<string, FiscalBehavior>;
   };
@@ -318,6 +322,16 @@ export default function TemplatesPage() {
     [audits, setAudits] = useState<Audit[]>([]);
   const [fiscalRules, setFiscalRules] = useState<FiscalRules>({}),
     [previewUf, setPreviewUf] = useState("");
+  const [wizardOpen, setWizardOpen] = useState(false),
+    [wizardStep, setWizardStep] = useState(1),
+    [wizardMode, setWizardMode] = useState<WizardMode>("copy"),
+    [wizardSource, setWizardSource] = useState<number>(),
+    [wizardName, setWizardName] = useState(""),
+    [wizardDescription, setWizardDescription] = useState(""),
+    [wizardRetaguarda, setWizardRetaguarda] = useState(""),
+    [wizardRegimes, setWizardRegimes] = useState<string[]>(["qualquer"]),
+    [wizardCreating, setWizardCreating] = useState(false),
+    [wizardError, setWizardError] = useState("");
   async function list(select?: number) {
     const r = await fetch("/api/mix/v1/templates");
     const j = await r.json();
@@ -370,6 +384,7 @@ export default function TemplatesPage() {
                 ? saved
                 : [legacy || "qualquer"],
             descricao: String(j.dados?.configuracao?.descricao || ""),
+            retaguarda: String(j.dados?.configuracao?.retaguarda || ""),
             modo_regras_fiscais: j.dados?.configuracao?.modo_regras_fiscais === "automatico" ? "automatico" : "desativado",
             excecoes_regras_fiscais: j.dados?.configuracao?.excecoes_regras_fiscais || {},
           },
@@ -474,19 +489,108 @@ export default function TemplatesPage() {
     await navigator.clipboard.writeText(value);
     setMessage(`Nome copiado: ${value}`);
   }
-  async function create(copy: boolean) {
-    const nome = prompt("Nome do novo template:")?.trim();
-    if (!nome) return;
-    const r = await fetch("/api/mix/v1/templates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome, copiar_de: copy ? selected : null }),
-    });
-    const j = await r.json();
-    if (!r.ok) return setMessage(j.detail);
-    setMessage(copy ? "Template copiado." : "Template criado do zero.");
-    await list(j.id);
-    if (isMaster) await loadAudit();
+  function startWizard(copyCurrent = false) {
+    const source = copyCurrent ? selected : selected || items[0]?.id;
+    setWizardMode(source ? "copy" : "blank");
+    setWizardSource(source);
+    setWizardName("");
+    setWizardDescription("");
+    setWizardRetaguarda("");
+    setWizardRegimes(["qualquer"]);
+    setWizardStep(copyCurrent ? 2 : 1);
+    setWizardError("");
+    setWizardOpen(true);
+  }
+  function closeWizard() {
+    if (wizardCreating) return;
+    setWizardOpen(false);
+    setWizardError("");
+  }
+  function toggleWizardRegime(regime: string, checked: boolean) {
+    if (regime === "qualquer") {
+      setWizardRegimes(checked ? ["qualquer"] : ["lucro_real"]);
+      return;
+    }
+    const base = wizardRegimes.filter((item) => item !== "qualquer");
+    const next = checked
+      ? [...new Set([...base, regime])]
+      : base.filter((item) => item !== regime);
+    setWizardRegimes(next.length ? next : ["qualquer"]);
+  }
+  async function createFromWizard() {
+    const nome = wizardName.trim();
+    if (nome.length < 2 || nome.length > 100) {
+      setWizardError("Informe um nome com 2 a 100 caracteres.");
+      setWizardStep(2);
+      return;
+    }
+    if (wizardMode === "copy" && !wizardSource) {
+      setWizardError("Escolha o template que será usado como base.");
+      setWizardStep(1);
+      return;
+    }
+    setWizardCreating(true);
+    setWizardError("");
+    let createdId: number | undefined;
+    try {
+      const response = await fetch("/api/mix/v1/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome,
+          copiar_de: wizardMode === "copy" ? wizardSource : null,
+        }),
+      });
+      const created = await response.json();
+      if (!response.ok) throw new Error(created.detail || "Não foi possível criar o template.");
+      createdId = Number(created.id);
+
+      const detailResponse = await fetch(`/api/mix/v1/templates/${createdId}`, {
+        cache: "no-store",
+      });
+      const detail = await detailResponse.json();
+      if (!detailResponse.ok)
+        throw new Error(detail.detail || "O template foi criado, mas não pôde ser preparado.");
+      const currentConfiguration = detail.dados?.configuracao || {};
+      const metadataResponse = await fetch(`/api/mix/v1/templates/${createdId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dados: {
+            configuracao: {
+              ...currentConfiguration,
+              descricao: wizardDescription.trim(),
+              retaguarda: wizardRetaguarda.trim(),
+              regimes_tributarios: wizardRegimes,
+            },
+          },
+        }),
+      });
+      const metadata = await metadataResponse.json();
+      if (!metadataResponse.ok)
+        throw new Error(metadata.detail || "O template foi criado, mas os dados iniciais não foram salvos.");
+
+      await list(createdId);
+      if (isMaster) await loadAudit();
+      setWizardOpen(false);
+      setMessage(
+        wizardMode === "copy"
+          ? "Template criado com a configuração da base. Revise os campos no editor abaixo."
+          : "Template vazio criado. Complete os campos necessários no editor abaixo.",
+      );
+    } catch (error) {
+      if (createdId) {
+        await list(createdId);
+        setWizardOpen(false);
+        setMessage(
+          `O template foi criado, mas precisa de revisão no editor: ${error instanceof Error ? error.message : "falha ao preparar os dados"}`,
+        );
+      } else {
+        setWizardError(error instanceof Error ? error.message : "Não foi possível criar o template.");
+      }
+    } finally {
+      setWizardCreating(false);
+    }
   }
   async function save() {
     if (!selected || !data) return;
@@ -540,7 +644,7 @@ export default function TemplatesPage() {
           </a>
           <span className="eyebrow dark">CONFIGURAÇÕES</span>
           <h1>Templates fiscais</h1>
-          <p>Crie e mantenha as regras utilizadas pelo worker.</p>
+          <p>Crie pelo assistente e use o editor completo para ajustes técnicos.</p>
         </div>
         <div className="editor-actions">
           <a className="editor-link-button" href="/painel/regras-fiscais"><MapPinned size={17} /> Regras por UF</a>
@@ -552,10 +656,10 @@ export default function TemplatesPage() {
               <History size={17} /> Auditoria
             </button>
           )}
-          <button onClick={() => create(false)}>
-            <Plus size={17} /> Novo
+          <button onClick={() => startWizard(false)}>
+            <Plus size={17} /> Novo template
           </button>
-          <button onClick={() => create(true)} disabled={!selected}>
+          <button onClick={() => startWizard(true)} disabled={!selected}>
             <Copy size={17} /> Copiar atual
           </button>
           <button onClick={() => setExpandAll(!expandAll)}>
@@ -578,6 +682,146 @@ export default function TemplatesPage() {
           </button>
         </div>
       </header>
+      {wizardOpen && (
+        <div className="modal-backdrop template-wizard-backdrop" onMouseDown={closeWizard}>
+          <form
+            className="modal template-wizard"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="template-wizard-title"
+            onMouseDown={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (wizardStep < 3) setWizardStep(wizardStep + 1);
+              else void createFromWizard();
+            }}
+          >
+            <header className="template-wizard-header">
+              <div>
+                <span className="eyebrow dark">CADASTRO GUIADO</span>
+                <h2 id="template-wizard-title">Novo template fiscal</h2>
+                <p>Configure o essencial agora e faça os ajustes técnicos depois.</p>
+              </div>
+              <button type="button" onClick={closeWizard} aria-label="Fechar cadastro">
+                <X size={20} />
+              </button>
+            </header>
+
+            <ol className="template-wizard-progress" aria-label="Etapas do cadastro">
+              {["Escolher base", "Identificar", "Revisar"].map((label, index) => {
+                const number = index + 1;
+                return (
+                  <li key={label} className={number === wizardStep ? "current" : number < wizardStep ? "done" : ""}>
+                    <b>{number < wizardStep ? <Check size={15} /> : number}</b>
+                    <span>{label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+
+            <div className="template-wizard-content">
+              {wizardStep === 1 && (
+                <section className="template-wizard-step">
+                  <div className="wizard-step-heading">
+                    <span>ETAPA 1</span>
+                    <h3>Como deseja começar?</h3>
+                    <p>Copiar uma base pronta reduz o preenchimento e mantém o padrão já validado.</p>
+                  </div>
+                  <div className="wizard-base-options">
+                    <button
+                      type="button"
+                      className={wizardMode === "copy" ? "selected" : ""}
+                      disabled={!items.length}
+                      onClick={() => setWizardMode("copy")}
+                    >
+                      <Copy size={22} />
+                      <span><strong>Copiar template existente</strong><small>Recomendado para retaguardas parecidas.</small></span>
+                      {wizardMode === "copy" && <Check size={18} />}
+                    </button>
+                    <button
+                      type="button"
+                      className={wizardMode === "blank" ? "selected" : ""}
+                      onClick={() => setWizardMode("blank")}
+                    >
+                      <Sparkles size={22} />
+                      <span><strong>Começar vazio</strong><small>Para uma configuração totalmente nova.</small></span>
+                      {wizardMode === "blank" && <Check size={18} />}
+                    </button>
+                  </div>
+                  {wizardMode === "copy" && (
+                    <label className="wizard-source-select">
+                      Template que será usado como base
+                      <select value={wizardSource || ""} onChange={(event) => setWizardSource(Number(event.target.value))} required>
+                        <option value="" disabled>Selecione uma base</option>
+                        {items.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                      </select>
+                      <small>Serão copiadas as tabelas, regras fiscais, divergências, XML e scheduler. Senhas de conexão não são copiadas.</small>
+                    </label>
+                  )}
+                </section>
+              )}
+
+              {wizardStep === 2 && (
+                <section className="template-wizard-step">
+                  <div className="wizard-step-heading">
+                    <span>ETAPA 2</span>
+                    <h3>Identifique o template</h3>
+                    <p>Essas informações ajudam a equipe a escolher a configuração correta.</p>
+                  </div>
+                  <div className="wizard-fields">
+                    <label>Nome do template
+                      <input autoFocus value={wizardName} maxLength={100} onChange={(event) => setWizardName(event.target.value)} placeholder="Ex.: Brajan — Lucro Presumido" required />
+                    </label>
+                    <label>Retaguarda
+                      <input value={wizardRetaguarda} onChange={(event) => setWizardRetaguarda(event.target.value)} list="template-retaguardas" placeholder="Ex.: Brajan" />
+                      <datalist id="template-retaguardas"><option value="Brajan"/><option value="Ecocentauro"/><option value="Monalisa"/><option value="VR"/></datalist>
+                    </label>
+                    <label className="wizard-description">Descrição de uso
+                      <textarea rows={3} value={wizardDescription} maxLength={500} onChange={(event) => setWizardDescription(event.target.value)} placeholder="Explique quando a equipe deve usar este template." />
+                    </label>
+                  </div>
+                  <fieldset className="wizard-regimes">
+                    <legend>Regimes tributários permitidos</legend>
+                    <label><input type="checkbox" checked={wizardRegimes.includes("qualquer")} onChange={(event) => toggleWizardRegime("qualquer", event.target.checked)} /> Todos</label>
+                    <label><input type="checkbox" checked={wizardRegimes.includes("lucro_real")} onChange={(event) => toggleWizardRegime("lucro_real", event.target.checked)} /> Lucro Real</label>
+                    <label><input type="checkbox" checked={wizardRegimes.includes("lucro_presumido")} onChange={(event) => toggleWizardRegime("lucro_presumido", event.target.checked)} /> Lucro Presumido</label>
+                    <label><input type="checkbox" checked={wizardRegimes.includes("simples_nacional")} onChange={(event) => toggleWizardRegime("simples_nacional", event.target.checked)} /> Simples Nacional</label>
+                  </fieldset>
+                </section>
+              )}
+
+              {wizardStep === 3 && (
+                <section className="template-wizard-step">
+                  <div className="wizard-step-heading">
+                    <span>ETAPA 3</span>
+                    <h3>Revise antes de criar</h3>
+                    <p>Depois da criação, o template será aberto no editor completo.</p>
+                  </div>
+                  <div className="wizard-review">
+                    <article><small>Nome</small><strong>{wizardName.trim() || "Não informado"}</strong></article>
+                    <article><small>Retaguarda</small><strong>{wizardRetaguarda.trim() || "Não informada"}</strong></article>
+                    <article><small>Base</small><strong>{wizardMode === "copy" ? items.find((item) => item.id === wizardSource)?.nome || "Não selecionada" : "Template vazio"}</strong></article>
+                    <article><small>Regime</small><strong>{wizardRegimes.includes("qualquer") ? "Todos" : wizardRegimes.map((item) => item === "lucro_real" ? "Lucro Real" : item === "lucro_presumido" ? "Lucro Presumido" : "Simples Nacional").join(", ")}</strong></article>
+                    {wizardDescription.trim() && <article className="wide"><small>Descrição</small><strong>{wizardDescription.trim()}</strong></article>}
+                  </div>
+                  <div className="wizard-next-note"><Check size={18}/><span><strong>Próximo passo</strong><small>Revise as VIEWs, TMPs, impostos e configurações opcionais no editor técnico.</small></span></div>
+                </section>
+              )}
+
+              {wizardError && <div className="form-error">{wizardError}</div>}
+            </div>
+
+            <footer className="template-wizard-actions">
+              <button type="button" className="wizard-cancel" onClick={wizardStep === 1 ? closeWizard : () => { setWizardError(""); setWizardStep(wizardStep - 1); }} disabled={wizardCreating}>
+                {wizardStep === 1 ? "Cancelar" : <><ArrowLeft size={17}/> Voltar</>}
+              </button>
+              <button type="submit" className="primary-button compact" disabled={wizardCreating || (wizardStep === 1 && wizardMode === "copy" && !wizardSource) || (wizardStep === 2 && wizardName.trim().length < 2)}>
+                {wizardCreating ? "Criando..." : wizardStep === 3 ? <><Check size={17}/> Criar e abrir editor</> : <>Continuar <ArrowRight size={17}/></>}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
       {message && (
         <div
           className="template-message-backdrop"
@@ -670,7 +914,7 @@ export default function TemplatesPage() {
       )}
       <section className="template-picker">
         <label>
-          Template ativo
+          Editar template existente
           <select
             value={selected || ""}
             onChange={(e) => setSelected(Number(e.target.value))}
@@ -687,6 +931,10 @@ export default function TemplatesPage() {
         </label>
         {data && (
           <div className="checks flag-panel">
+            <label>
+              Retaguarda
+              <input value={data.configuracao.retaguarda} onChange={(event) => setData((current) => current ? { ...current, configuracao: { ...current.configuracao, retaguarda: event.target.value } } : current)} placeholder="Ex.: Brajan, Ecocentauro ou Monalisa" />
+            </label>
             <label>
               Descrição de uso
               <textarea rows={2} value={data.configuracao.descricao} onChange={(event) => setData((current) => current ? { ...current, configuracao: { ...current.configuracao, descricao: event.target.value } } : current)} placeholder="Explique quando este template deve ser utilizado." />
