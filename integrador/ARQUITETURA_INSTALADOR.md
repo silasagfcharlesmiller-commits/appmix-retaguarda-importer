@@ -57,6 +57,68 @@ O arquivo Inno Setup está configurado com `ArchitecturesAllowed=x64compatible` 
 64 bits. Ainda não há `MinVersion` no script `.iss`; portanto, o setup não bloqueia sozinho todas
 as versões antigas do Windows. A tabela acima deve ser tratada como requisito operacional.
 
+### Comparação com o `desktop-integrador.exe` fornecido
+
+Análise estática realizada em 2026-09-10, sem executar o Integrador nem acessar o portal:
+
+| Propriedade | Valor encontrado |
+| --- | --- |
+| SHA-256 | `EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8` |
+| Arquitetura PE | `AMD64` / 64 bits |
+| Versão interna do Integrador | `v0.0.120` |
+| Linguagem/runtime | Go `1.26.4` |
+| Framework desktop | Wails `2.14.0` |
+| Interface | WebView2 |
+| Alvo da compilação | `windows/amd64`, `GOAMD64=v1` |
+| Cabeçalho PE | versão mínima declarada `6.1` |
+| Manifesto | declara famílias Windows 7, 8, 8.1 e 10 |
+
+O cabeçalho PE e o manifesto indicam que o Windows pode tentar carregar o arquivo em versões
+antigas, mas não comprovam suporte funcional. O limite mais forte vem do Go: versões Go 1.21 ou
+superiores têm como requisito oficial Windows 10 ou Windows Server 2016 ou superior. O Wails v2
+publica suporte para Windows 10/11 e exige WebView2. A Microsoft mantém o WebView2 em Windows 10 e
+em Windows Server 2016 ou superior.
+
+Com a evidência disponível, o patamar técnico do Integrador oficial é:
+
+```text
+Cliente: Windows 10/11, 64 bits
+Servidor: Windows Server 2016 ou superior, 64 bits, sujeito a validação da Mix/Wails
+```
+
+Não foi encontrada documentação pública da Mix Fiscal informando uma versão mínima própria. Por
+isso, Server 2016 deve ser tratado como compatibilidade técnica a testar, não como garantia formal
+do fornecedor.
+
+Comparação com a interface atual do nosso instalador:
+
+| Ambiente | Integrador oficial | Instalador atual em PyQt6 6.11 | Alinhamento |
+| --- | --- | --- | --- |
+| Windows 10 1809+ x64 | Dentro do patamar | Suportado | Alinhado |
+| Windows 11 x64 | Dentro do patamar | Suportado | Alinhado |
+| Server 2019/2022/2025 x64 | Tecnicamente compatível | Patamar adotado pelo projeto | Alinhado |
+| Server 2016 x64 | Tecnicamente compatível | Qt 6.11 não o lista como alvo | Diferença a corrigir/testar |
+| Windows 10 anterior ao 1809 | Go/WebView2 podem admitir parte dessas versões | Qt 6.11 não suporta | Diferença sem valor operacional atual |
+
+O PyQt6 é, portanto, a camada que pode reduzir o alcance no Server 2016. Fazer apenas downgrade do
+PyQt6 não resolve de forma limpa, pois a família Qt 6 mantém requisitos mais novos. Migrar para
+PyQt5 ampliaria o alcance, mas introduziria uma linha Qt antiga e com suporte encerrado.
+
+A alternativa recomendada para igualar o instalador ao patamar técnico do Integrador é substituir
+somente `instalador_gui.py` por uma interface Windows em `tkinter/ttk`, mantendo todo o motor Python,
+CDP/WebSocket, diagnóstico, API, Machine ID e monitor. O Python 3.12 usado no pacote suporta Windows
+8.1 ou superior, portanto não seria o limitador para Windows 10 ou Server 2016. Depois da migração,
+o Inno Setup deve declarar `MinVersion=10.0` e o pacote deve ser validado em:
+
+- Windows 10 22H2;
+- Windows 11;
+- Windows Server 2016, 2019 e 2022;
+- uma máquina com WebView2 e outra sem WebView2;
+- uma sessão RDP administrativa e uma elevação com conta diferente.
+
+Até essa migração e esses testes acontecerem, o requisito recomendado deste instalador continua
+sendo Windows 10 1809+ ou Windows Server 2019+.
+
 ## Arquitetura por camadas
 
 ```text
