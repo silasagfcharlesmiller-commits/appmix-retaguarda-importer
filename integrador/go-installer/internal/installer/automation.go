@@ -140,6 +140,13 @@ func (installer *Installer) StopIntegrator() error {
 	return hiddenCommand("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script, target).Run()
 }
 
+func (installer *Installer) IntegratorRunning() bool {
+	target := installer.TargetEXE
+	script := `$target=$args[0]; $process=Get-CimInstance Win32_Process -Filter "Name='desktop-integrador.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.ExecutablePath -eq $target} | Select-Object -First 1; if ($null -ne $process) {'running'}`
+	output, err := hiddenCommand("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script, target).Output()
+	return err == nil && strings.TrimSpace(string(output)) == "running"
+}
+
 func (installer *Installer) StartIntegratorVerified(diagnostics *Diagnostics, progress func(string)) error {
 	if _, err := os.Stat(installer.TargetEXE); err != nil {
 		return fail("O Integrador desapareceu antes da inicialização final.")
@@ -162,6 +169,15 @@ func (installer *Installer) StartIntegratorVerified(diagnostics *Diagnostics, pr
 	}
 	diagnostics.Event("processo", "ok", "Integrador iniciado e permaneceu em execução", nil)
 	return nil
+}
+
+func (installer *Installer) EnsureIntegratorOpenVerified(diagnostics *Diagnostics, progress func(string)) error {
+	if installer.IntegratorRunning() {
+		progress("Integrador mantido aberto e autenticado para conferência")
+		diagnostics.Event("processo", "ok", "Integrador mantido aberto com a sessão usada na instalação", nil)
+		return nil
+	}
+	return installer.StartIntegratorVerified(diagnostics, progress)
 }
 
 type debugRestore struct {
@@ -267,7 +283,7 @@ func openSettingsWithLogin(page *CDPPage, username, password string, progress fu
 
 func installFromSettings(page *CDPPage, progress func(string)) error {
 	progress("Instalando a inicialização automática")
-	value, err := page.EvaluateRetry("window.go.app.App.GetWindowsServiceStatus()", 3, 700*time.Millisecond)
+	value, err := page.EvaluateRetry("window.go.app.App.GetWindowsServiceStatus()", 5, time.Second)
 	if err != nil {
 		return fail("Falha ao consultar a inicialização automática do Integrador: %v", err)
 	}
@@ -280,13 +296,20 @@ func installFromSettings(page *CDPPage, progress func(string)) error {
 		if err := page.ClickText("Instalar", "button", false); err != nil {
 			return err
 		}
+		// O Integrador pode reconstruir a página logo após instalar suas tarefas.
+		// Aguarde a ponte reaparecer antes de confirmar o estado final.
+		_ = page.WaitIntegratorBridge(15 * time.Second)
 	}
 	deadline := time.Now().Add(35 * time.Second)
+	var lastStatusErr error
 	for time.Now().Before(deadline) {
-		value, err = page.EvaluateRetry("window.go.app.App.GetWindowsServiceStatus()", 3, 700*time.Millisecond)
+		value, err = page.EvaluateRetry("window.go.app.App.GetWindowsServiceStatus()", 2, 700*time.Millisecond)
 		if err != nil {
-			return fail("Falha ao confirmar a inicialização automática do Integrador: %v", err)
+			lastStatusErr = err
+			time.Sleep(500 * time.Millisecond)
+			continue
 		}
+		lastStatusErr = nil
 		status = fmt.Sprint(value)
 		if status == "running" {
 			return nil
@@ -295,6 +318,9 @@ func installFromSettings(page *CDPPage, progress func(string)) error {
 			_ = page.ClickText("Iniciar", "button", false)
 		}
 		time.Sleep(500 * time.Millisecond)
+	}
+	if lastStatusErr != nil {
+		return fail("Falha ao confirmar a inicialização automática do Integrador após aguardar a atualização da tela: %v", lastStatusErr)
 	}
 	return fail("A inicialização não ficou ativa; estado atual: %q.", status)
 }
@@ -414,7 +440,10 @@ func automateUI(cnpj, username, password, expectedID string, progress func(strin
 	if err := installFromSettings(page, progress); err != nil {
 		return "", err
 	}
-	progress("Instalação ativa; preparando a abertura da interface")
+	if page.VisibleText("Dashboard", "a,button", false) {
+		_ = page.ClickText("Dashboard", "a,button", false)
+	}
+	progress("Instalação ativa; o Integrador permanecerá aberto para conferência")
 	return machineID, nil
 }
 
@@ -422,9 +451,12 @@ func (installer *Installer) Install(cnpj, username, password string, progress fu
 	diagnostics := NewDiagnostics(installer.TargetDir)
 	result, machineID, err := installer.runInstall(cnpj, username, password, diagnostics, progress)
 	if err != nil {
-		_ = installer.StopIntegrator()
-		if machineID != "" {
-			_ = installer.StartIntegratorVerified(diagnostics, func(string) {})
+		if installer.IntegratorRunning() {
+			diagnostics.Event("processo", "atenção", "Integrador mantido aberto para revisão manual após a falha", nil)
+		} else if machineID != "" {
+			if startErr := installer.StartIntegratorVerified(diagnostics, func(string) {}); startErr != nil {
+				diagnostics.Event("processo", "atenção", "Não foi possível reabrir o Integrador após a falha", map[string]any{"error": startErr})
+			}
 		}
 		diagnostics.Event("instalação", "erro", err.Error(), nil)
 		if findings := securityProtectionFindings(installer.TargetDir); findings > 0 {
@@ -440,12 +472,6 @@ func (installer *Installer) Install(cnpj, username, password string, progress fu
 
 func (installer *Installer) runInstall(cnpj, username, password string, diagnostics *Diagnostics, progress func(string)) (InstallResult, string, error) {
 	machineID := ""
-	completed := false
-	defer func() {
-		if !completed {
-			_ = installer.StopIntegrator()
-		}
-	}()
 	if !isAdministrator() {
 		return InstallResult{}, machineID, fail("Execute o instalador como administrador.")
 	}
@@ -518,11 +544,9 @@ func (installer *Installer) runInstall(cnpj, username, password string, diagnost
 		return InstallResult{}, machineID, err
 	}
 	diagnostics.Event("cadastro", "ok", "CNPJ, serviço Mix Fiscal e Machine ID confirmados", nil)
-	_ = installer.StopIntegrator()
-	if err := installer.StartIntegratorVerified(diagnostics, progress); err != nil {
+	if err := installer.EnsureIntegratorOpenVerified(diagnostics, progress); err != nil {
 		return InstallResult{}, machineID, err
 	}
-	completed = true
 	return InstallResult{CNPJ: normalizedCNPJ, MachineID: machineID, Monitor: monitorTask}, machineID, nil
 }
 

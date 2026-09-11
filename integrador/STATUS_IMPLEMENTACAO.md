@@ -1,10 +1,10 @@
 # Status da automação do Integrador
 
-Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
+Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
 
 ## Candidata atual
 
-- versão: `1.2.2`;
+- versão: `1.2.3`;
 - interface: Go 1.26 + Wails 2 + HTML/CSS/JavaScript;
 - pacote: Inno Setup elevado;
 - runtime cliente: dois executáveis Go e um manifesto;
@@ -28,6 +28,8 @@ Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 - reaproveitamento idempotente do Machine ID existente;
 - geração única pela interface oficial quando nenhum ID existe;
 - preenchimento de CNPJ, serviço `mixfiscal`, Salvar e Instalar/Iniciar;
+- preservação da mesma sessão autenticada do Integrador, aberta no final e também em falhas
+  posteriores para conferência manual;
 - monitor instalado por `Painel_Mix.bat --install-monitor` e tarefa consultada;
 - confirmação de CNPJ, serviço e Machine ID exato na API e espera pelo status online;
 - logs sem credenciais e indicação de ocorrências relacionadas do Microsoft Defender;
@@ -43,18 +45,18 @@ Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 - Inno Setup 6.7.3 gerou o pacote completo;
 - o verificador confirmou dois binários nativos e ausência de Python/PyQt/Playwright/Node;
 - a prévia do frontend foi renderizada em Edge/WebView e não apresentou cortes em 1100 × 850;
-- candidata `1.2.2` gerada pelo publicador canônico: 13.830.157 bytes;
-- SHA-256 do setup candidato: `DF6184AE0E119DB63AEBF908707CECC8D2EDBA219CA4CA5DC138C119C7DCE4C7`.
+- candidata `1.2.3` gerada pelo publicador canônico: 13.834.342 bytes;
+- SHA-256 do setup candidato: `D5E90CCC4DBD665BF36319371FAF9E718168985740A3F362C349343F2428D539`;
+- Microsoft Defender não encontrou ameaças no setup candidato.
 
 ## Antes de produção
 
-1. gerar `1.2.2` somente pelo comando de [`PUBLICACAO.md`](PUBLICACAO.md);
-2. executar o teste completo autorizado em máquina cliente/VM;
-3. validar Windows 10/11 e Server 2016/2019/2022;
-4. testar uma máquina com WebView2 e outra sem;
-5. testar RDP com a mesma conta elevada e com conta diferente;
-6. revisar `git status --short -- web`, build do Next.js e artefatos públicos;
-7. mesclar em `main` e publicar pela Vercel somente após aprovação.
+1. executar o teste completo autorizado em máquina cliente/VM;
+2. validar Windows 10/11 e Server 2016/2019/2022;
+3. testar uma máquina com WebView2 e outra sem;
+4. testar RDP com a mesma conta elevada e com conta diferente;
+5. revisar `git status --short -- web`, build do Next.js e artefatos públicos;
+6. mesclar em `main` e publicar pela Vercel somente após aprovação.
 
 O teste local não executou o Integrador real, não autenticou no portal e não alterou nenhum CNPJ ou
 Machine ID. Essas ações exigem autorização pontual para o ambiente e cliente exatos.
