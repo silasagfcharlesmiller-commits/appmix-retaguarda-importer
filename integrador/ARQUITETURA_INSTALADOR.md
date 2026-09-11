@@ -1,7 +1,7 @@
 # Arquitetura do Instalador do Integrador Mix Fiscal
 
 Referência técnica atualizada em **2026-09-11** para a branch
-`integrador-v1.2-go-wails`, candidata `1.2.6`. Antes de gerar ou publicar, leia também
+`main`, versão `1.2.7`. Antes de gerar ou publicar, leia também
 [`PUBLICACAO.md`](PUBLICACAO.md) e confirme o branch e o `git status`.
 
 ## Decisão de tecnologia
@@ -156,7 +156,9 @@ abrir setup e elevar
   -> esperar o ID exato ficar online
   -> localizar pelo WebView2 a janela que já está aberta e aproveitá-la
   -> abrir uma janela nova somente quando nenhuma interface estiver disponível
+  -> aguardar a tela real de login ou a navegação autenticada ficar pronta
   -> autenticar novamente, abrir Configurações e confirmar o segundo login quando solicitado
+  -> restaurar e trazer para frente a janela quando estiver minimizada ou oculta na bandeja
   -> manter o Integrador aberto em Configurações para conferência
 ```
 

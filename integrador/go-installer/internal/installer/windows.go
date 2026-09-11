@@ -44,6 +44,11 @@ var (
 	procWTSFreeMemory        = wtsapi32.NewProc("WTSFreeMemory")
 	procIsUserAnAdmin        = shell32.NewProc("IsUserAnAdmin")
 	procMessageBoxW          = user32.NewProc("MessageBoxW")
+	procEnumWindows          = user32.NewProc("EnumWindows")
+	procGetWindowThreadPID   = user32.NewProc("GetWindowThreadProcessId")
+	procGetWindowTextLengthW = user32.NewProc("GetWindowTextLengthW")
+	procShowWindowAsync      = user32.NewProc("ShowWindowAsync")
+	procSetForegroundWindow  = user32.NewProc("SetForegroundWindow")
 )
 
 type WindowsIdentity struct {
@@ -58,6 +63,46 @@ func hiddenCommand(name string, args ...string) *exec.Cmd {
 	command := exec.Command(name, args...)
 	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
 	return command
+}
+
+func showExecutableWindow(executable string) bool {
+	target, err := filepath.Abs(executable)
+	if err != nil {
+		return false
+	}
+	found := false
+	callback := syscall.NewCallback(func(windowHandle, _ uintptr) uintptr {
+		var processID uint32
+		procGetWindowThreadPID.Call(windowHandle, uintptr(unsafe.Pointer(&processID)))
+		if processID == 0 {
+			return 1
+		}
+		process, openErr := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, processID)
+		if openErr != nil {
+			return 1
+		}
+		defer windows.CloseHandle(process)
+		buffer := make([]uint16, 32768)
+		size := uint32(len(buffer))
+		if queryErr := windows.QueryFullProcessImageName(process, 0, &buffer[0], &size); queryErr != nil {
+			return 1
+		}
+		processPath := windows.UTF16ToString(buffer[:size])
+		if !strings.EqualFold(filepath.Clean(processPath), filepath.Clean(target)) {
+			return 1
+		}
+		textLength, _, _ := procGetWindowTextLengthW.Call(windowHandle)
+		if textLength == 0 {
+			return 1
+		}
+		const swRestore = 9
+		procShowWindowAsync.Call(windowHandle, swRestore)
+		procSetForegroundWindow.Call(windowHandle)
+		found = true
+		return 1
+	})
+	procEnumWindows.Call(callback, 0)
+	return found
 }
 
 func isAdministrator() bool {

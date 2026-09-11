@@ -1,16 +1,16 @@
 # Status da automação do Integrador
 
-Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
+Atualizado em 2026-09-11 na branch `main`.
 
 ## Candidata atual
 
-- versão: `1.2.6`;
+- versão: `1.2.7`;
 - interface: Go 1.26 + Wails 2 + HTML/CSS/JavaScript;
 - pacote: Inno Setup elevado;
 - runtime cliente: dois executáveis Go e um manifesto;
 - automação: CDP/WebSocket direto, sem Playwright;
 - destino: a mesma pasta em que o setup foi colocado;
-- publicação: ainda depende de revisão/merge/push em `main`.
+- publicação: download e atualização automática pelo site após o push em `main`.
 
 ## Implementado
 
@@ -32,6 +32,8 @@ Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
   o servidor bloqueia consultas CIM; nova abertura somente como contingência;
 - login final, entrada em **Configurações**, segundo login quando solicitado e manutenção dessa
   tela aberta para conferência;
+- espera da tela real de login antes de preencher as credenciais e restauração da janela do
+  Integrador quando ela estiver minimizada ou oculta na bandeja;
 - monitor instalado por `Painel_Mix.bat --install-monitor` e tarefa consultada;
 - opção 5 do Painel Mix exclui suas tarefas agendadas, remove o VBS, desativa as tarefas nativas
   e valida a limpeza sem impedir uma reinstalação pela opção 2;
@@ -49,8 +51,8 @@ Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
 - Inno Setup 6.7.3 gerou o pacote completo;
 - o verificador confirmou dois binários nativos e ausência de Python/PyQt/Playwright/Node;
 - a prévia do frontend foi renderizada em Edge/WebView e não apresentou cortes em 1100 × 850;
-- candidata `1.2.6` gerada pelo publicador canônico: 13.834.278 bytes;
-- SHA-256 do setup candidato: `25CC3B31CFA1988A61D98E06D40CF481A4D0B55FE52520BD391E283ED2557898`;
+- candidata `1.2.7` gerada pelo publicador canônico: 13.838.153 bytes;
+- SHA-256 do setup candidato: `0AC479EDA92065F080FF77D6348CC92E3C033DAE8314ED00C0910A999813A362`;
 - Microsoft Defender não encontrou ameaças no setup candidato;
 
 ## Antes de produção

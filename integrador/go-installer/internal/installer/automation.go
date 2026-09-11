@@ -246,6 +246,10 @@ func persistNativeID(page *CDPPage, machineID string) error {
 }
 
 func authenticateIntegrator(page *CDPPage, username, password string, progress func(string)) error {
+	ready := `(()=>{const visible=e=>{if(!e)return false;const s=getComputedStyle(e);const r=e.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0};const login=[...document.querySelectorAll('input,textarea')].find(e=>e.getAttribute('placeholder')==='Email ou CPF/CNPJ');const app=[...document.querySelectorAll('a,button,h1,h2,h3')].find(e=>['Dashboard','Configurações'].includes((e.innerText||'').trim()));return visible(login)||visible(app)})()`
+	if err := page.Wait(ready, 25*time.Second, "A tela de login do Integrador não ficou pronta."); err != nil {
+		return err
+	}
 	if !page.VisiblePlaceholder("Email ou CPF/CNPJ", 0) {
 		return nil
 	}
@@ -343,6 +347,20 @@ func (installer *Installer) OpenIntegratorAuthenticatedForReview(username, passw
 	}
 	if err := openSettingsWithLogin(page, username, password, progress); err != nil {
 		return fail("O Integrador foi instalado e autenticado, mas não permaneceu em Configurações: %v", err)
+	}
+	progress("Exibindo o Integrador autenticado para conferência")
+	if !showExecutableWindow(installer.TargetEXE) {
+		// Algumas versões ficam somente na bandeja depois de instalar o serviço.
+		// Uma segunda abertura pede à instância existente para exibir a interface.
+		command := hiddenCommand(installer.TargetEXE)
+		command.Dir = installer.TargetDir
+		if err := command.Start(); err != nil {
+			return fail("O Integrador foi autenticado, mas o Windows não permitiu exibir a janela final.")
+		}
+		time.Sleep(2 * time.Second)
+		if !showExecutableWindow(installer.TargetEXE) {
+			return fail("O Integrador foi autenticado, mas a janela final permaneceu oculta.")
+		}
 	}
 	progress("Integrador aberto, autenticado e em Configurações")
 	diagnostics.Event("processo", "ok", "Integrador reaberto, autenticado e mantido na tela de Configurações", nil)

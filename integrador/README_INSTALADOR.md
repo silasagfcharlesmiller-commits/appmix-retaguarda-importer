@@ -25,7 +25,7 @@ abra-o. Ele instala todos os componentes nessa mesma pasta.
 11. confirma na API que o ID exato usado pelo robô ficou online;
 12. aproveita a janela do Integrador que já estiver aberta; se ela não existir, abre outra;
 13. faz o login novamente, entra em **Configurações**, confirma o segundo login quando solicitado
-    e mantém essa tela aberta para conferência;
+    e restaura a janela quando ela estiver minimizada ou oculta na bandeja;
 14. marca o executável para sempre solicitar administrador.
 
 Os dados de banco e de retaguarda continuam sendo enviados pelo site. O setup não apaga IDs de
@@ -85,7 +85,7 @@ Para gerar uma versão, leia [`PUBLICACAO.md`](PUBLICACAO.md) e use somente:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\PUBLICAR_ATUALIZACAO.ps1 `
-  -Versao 1.2.6 `
+  -Versao 1.2.7 `
   -Executavel "C:\caminho\desktop-integrador.exe"
 ```
 
