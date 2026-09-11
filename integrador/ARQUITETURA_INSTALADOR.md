@@ -104,11 +104,53 @@ O PyQt6 é, portanto, a camada que pode reduzir o alcance no Server 2016. Fazer 
 PyQt6 não resolve de forma limpa, pois a família Qt 6 mantém requisitos mais novos. Migrar para
 PyQt5 ampliaria o alcance, mas introduziria uma linha Qt antiga e com suporte encerrado.
 
-A alternativa recomendada para igualar o instalador ao patamar técnico do Integrador é substituir
-somente `instalador_gui.py` por uma interface Windows em `tkinter/ttk`, mantendo todo o motor Python,
-CDP/WebSocket, diagnóstico, API, Machine ID e monitor. O Python 3.12 usado no pacote suporta Windows
-8.1 ou superior, portanto não seria o limitador para Windows 10 ou Server 2016. Depois da migração,
-o Inno Setup deve declarar `MinVersion=10.0` e o pacote deve ser validado em:
+Há três caminhos possíveis:
+
+1. trocar somente PyQt6 por `tkinter/ttk`, mantendo o motor Python; é a menor alteração e acompanha
+   Windows 10/Server 2016, mas não remove Python/PyInstaller;
+2. portar interface e motor para C# com WPF, mantendo CDP/WebSocket; remove Python, mas acrescenta o
+   runtime .NET ao pacote ou como pré-requisito;
+3. portar interface e motor para **Go + Wails + HTML/CSS/JavaScript**, usando o mesmo conjunto de
+   tecnologias do Integrador oficial; este é o caminho recomendado para obter o mesmo patamar.
+
+Na terceira opção, o protocolo e o comportamento não mudam. Um cliente WebSocket em Go substitui
+`cdp_browser.py`; o cliente HTTP, JSON, SHA-256, Registro, WTS, processos e Agendador também passam
+para Go. O frontend Wails usa arquivos web incorporados ao EXE e pode reproduzir o visual Mix com
+cartões, cantos arredondados, ícones vetoriais, escala responsiva, rolagem, campo de senha com olho e
+progresso detalhado. Node pode ser usado somente durante o build se o frontend usar React/Vite; ele
+não acompanha o executável entregue. Também é possível usar HTML/CSS/JavaScript sem framework.
+
+O alvo sugerido é o mesmo observado no Integrador: `windows/amd64`, `GOAMD64=v1`, Go 1.26 e Wails
+v2. O instalador interno torna-se um EXE nativo Go, sem Python, PyQt6, PyInstaller, .NET ou extração
+de runtime no `%TEMP%`. Isso tende a reduzir a pasta interna e elimina a assinatura típica de pacote
+PyInstaller, embora a assinatura digital própria continue necessária para reputação no SmartScreen
+e em antivírus corporativos.
+
+Como uma janela Wails depende do WebView2 para abrir, a verificação do Runtime deve sair da atual
+interface Python e acontecer antes dela, no Inno Setup ou em um pequeno bootstrap nativo Go sem
+interface WebView. O fluxo futuro recomendado é:
+
+```text
+Inno Setup elevado
+  -> verificar sistema, arquitetura e conta
+  -> detectar WebView2 no Registro
+  -> se ausente, baixar o bootstrapper Microsoft, validar assinatura, instalar e aguardar
+  -> abrir Instalador-Mix-Fiscal-App.exe em Go/Wails
+  -> executar diagnóstico, login, CNPJ, Machine ID, monitor e validação online
+```
+
+O `desktop-integrador.exe` analisado já foi compilado com a estratégia Wails
+`wv2runtime.download`. O nosso setup pode manter uma verificação mais rígida e silenciosa antes de
+abrir a tela, evitando depender da confirmação manual oferecida pelo Wails quando o Runtime falta.
+
+WinUI 3 não é indicado para este caso porque seu mínimo continua Windows 10 1809. Electron voltaria
+a incluir Node/Chromium no cliente. Tauri também dependeria de WebView2, mas introduziria Rust e um
+segundo ecossistema sem trazer vantagem sobre Wails. C++/Win32 seria menor, porém aumentaria o custo
+e o risco de manutenção.
+
+A migração completa deve ser feita em branch separada, mantendo esta versão Python utilizável até a
+paridade dos testes. Depois da migração, o Inno Setup deve declarar a versão mínima compatível com o
+Integrador oficial e o pacote deve ser validado em:
 
 - Windows 10 22H2;
 - Windows 11;
