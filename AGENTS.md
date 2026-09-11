@@ -19,7 +19,8 @@
 
 ## Publicação do Integrador e da Vercel
 
-- Antes de alterar ou publicar o Integrador, leia `integrador/PUBLICACAO.md`.
+- Antes de alterar ou publicar o Integrador, leia `integrador/ARQUITETURA_INSTALADOR.md` e
+  `integrador/PUBLICACAO.md`.
 - Execute a publicação sempre na raiz `C:\Users\Hom\Desktop\appmix` com
   `integrador\PUBLICAR_ATUALIZACAO.ps1` e uma versão SemVer superior à atual.
 - O comando canônico está documentado em `integrador/PUBLICACAO.md`; não monte o
