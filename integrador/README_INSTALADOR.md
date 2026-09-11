@@ -23,9 +23,10 @@ abra-o. Ele instala todos os componentes nessa mesma pasta.
 9. clica **Salvar Configurações** e depois **Instalar/Iniciar**;
 10. instala o monitor pelo `Painel_Mix.bat` sem janela piscando;
 11. confirma na API que o ID exato usado pelo robô ficou online;
-12. reabre o Integrador na sessão visível, faz o login novamente, entra em **Configurações**,
-    confirma o segundo login quando solicitado e mantém essa tela aberta para conferência;
-13. marca o executável para sempre solicitar administrador.
+12. aproveita a janela do Integrador que já estiver aberta; se ela não existir, abre outra;
+13. faz o login novamente, entra em **Configurações**, confirma o segundo login quando solicitado
+    e mantém essa tela aberta para conferência;
+14. marca o executável para sempre solicitar administrador.
 
 Os dados de banco e de retaguarda continuam sendo enviados pelo site. O setup não apaga IDs de
 XML ou de outras instalações. Se os dois arquivos locais tiverem IDs conflitantes, ele para e
@@ -82,7 +83,7 @@ Para gerar uma versão, leia [`PUBLICACAO.md`](PUBLICACAO.md) e use somente:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\PUBLICAR_ATUALIZACAO.ps1 `
-  -Versao 1.2.4 `
+  -Versao 1.2.5 `
   -Executavel "C:\caminho\desktop-integrador.exe"
 ```
 

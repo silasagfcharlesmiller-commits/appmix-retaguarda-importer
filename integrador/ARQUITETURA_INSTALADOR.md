@@ -1,7 +1,7 @@
 # Arquitetura do Instalador do Integrador Mix Fiscal
 
 Referência técnica atualizada em **2026-09-11** para a branch
-`integrador-v1.2-go-wails`, candidata `1.2.4`. Antes de gerar ou publicar, leia também
+`integrador-v1.2-go-wails`, candidata `1.2.5`. Antes de gerar ou publicar, leia também
 [`PUBLICACAO.md`](PUBLICACAO.md) e confirme o branch e o `git status`.
 
 ## Decisão de tecnologia
@@ -154,16 +154,18 @@ abrir setup e elevar
   -> confirmar CNPJ, serviço e Machine ID exato pela API
   -> conferir o mesmo ID nos dois arquivos locais
   -> esperar o ID exato ficar online
-  -> encerrar a instância substituída pela instalação e abrir uma janela final controlada
+  -> localizar pelo WebView2 a janela que já está aberta e aproveitá-la
+  -> abrir uma janela nova somente quando nenhuma interface estiver disponível
   -> autenticar novamente, abrir Configurações e confirmar o segundo login quando solicitado
   -> manter o Integrador aberto em Configurações para conferência
 ```
 
 A automação usa Chrome DevTools Protocol diretamente por WebSocket em
 `go-installer/internal/installer/cdp.go`. A porta é ligada no Registro apenas durante o fluxo e o
-valor anterior é restaurado no `defer`, inclusive em falha. Como a instalação das tarefas nativas
-pode encerrar o primeiro processo, a etapa final abre uma instância nova na sessão interativa,
-repete os logins necessários e só conclui depois de confirmar a tela **Configurações** aberta.
+valor anterior é restaurado no `defer`, inclusive em falha. Ele permanece configurado até a
+conferência final, permitindo aproveitar inclusive uma instância substituída pelas tarefas nativas.
+A porta WebView2 comprova a interface em máquinas que bloqueiam consultas de processo via CIM. A
+etapa repete os logins necessários e só conclui depois de confirmar **Configurações** aberta.
 
 ## Machine ID e idempotência
 

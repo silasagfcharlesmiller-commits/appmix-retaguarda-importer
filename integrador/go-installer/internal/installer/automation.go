@@ -306,22 +306,24 @@ func openSettingsWithLogin(page *CDPPage, username, password string, progress fu
 }
 
 func (installer *Installer) OpenIntegratorAuthenticatedForReview(username, password string, diagnostics *Diagnostics, progress func(string)) error {
-	progress("Reabrindo o Integrador para conferência final")
-	restore, err := enableTemporaryWebViewDebug()
-	if err != nil {
-		return err
-	}
-	defer restore.Close()
-
-	// A instalação das tarefas pode encerrar ou substituir o processo usado pela
-	// primeira automação. Abra uma instância nova na sessão interativa e autentique-a.
-	_ = installer.StopIntegrator()
-	waitDebugPortClosed(5 * time.Second)
-	if err := installer.StartIntegratorVerified(diagnostics, progress); err != nil {
-		return err
-	}
-	if err := waitDebugPort(30 * time.Second); err != nil {
-		return err
+	progress("Aproveitando o Integrador já aberto para a conferência final")
+	// A porta pertence somente ao WebView2 do Integrador e é uma evidência mais
+	// confiável do que CIM em servidores que restringem a consulta de processos.
+	ready := waitDebugPort(8*time.Second) == nil
+	if !ready {
+		progress("A janela anterior não está disponível; abrindo o Integrador para conferência")
+		_ = installer.StopIntegrator()
+		waitDebugPortClosed(5 * time.Second)
+		command := hiddenCommand(installer.TargetEXE)
+		command.Dir = installer.TargetDir
+		if err := command.Start(); err != nil {
+			return fail("O Windows bloqueou a abertura final do Integrador.")
+		}
+		// O primeiro PID pode entregar a execução para a instância instalada e sair.
+		// A porta do WebView2 identifica a janela real que deve ser automatizada.
+		if err := waitDebugPort(35 * time.Second); err != nil {
+			return fail("O Integrador foi instalado, mas a janela final não abriu para conferência.")
+		}
 	}
 	page, err := NewCDPPage(debugPort)
 	if err != nil {
@@ -341,9 +343,6 @@ func (installer *Installer) OpenIntegratorAuthenticatedForReview(username, passw
 	}
 	if err := openSettingsWithLogin(page, username, password, progress); err != nil {
 		return fail("O Integrador foi instalado e autenticado, mas não permaneceu em Configurações: %v", err)
-	}
-	if !installer.IntegratorRunning() {
-		return fail("O Integrador foi autenticado, mas encerrou antes da conferência final.")
 	}
 	progress("Integrador aberto, autenticado e em Configurações")
 	diagnostics.Event("processo", "ok", "Integrador reaberto, autenticado e mantido na tela de Configurações", nil)
@@ -505,7 +504,7 @@ func (installer *Installer) Install(cnpj, username, password string, progress fu
 	diagnostics := NewDiagnostics(installer.TargetDir)
 	result, machineID, err := installer.runInstall(cnpj, username, password, diagnostics, progress)
 	if err != nil {
-		if installer.IntegratorRunning() {
+		if waitDebugPort(time.Second) == nil || installer.IntegratorRunning() {
 			diagnostics.Event("processo", "atenção", "Integrador mantido aberto para revisão manual após a falha", nil)
 		} else if machineID != "" {
 			if startErr := installer.StartIntegratorVerified(diagnostics, func(string) {}); startErr != nil {
@@ -561,9 +560,9 @@ func (installer *Installer) runInstall(cnpj, username, password string, diagnost
 	if debugErr != nil {
 		return InstallResult{}, machineID, debugErr
 	}
+	defer restore.Close()
 	var automationErr error
 	func() {
-		defer restore.Close()
 		_ = installer.StopIntegrator()
 		command := hiddenCommand(installer.TargetEXE)
 		command.Dir = installer.TargetDir
