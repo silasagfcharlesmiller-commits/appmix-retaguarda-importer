@@ -18,6 +18,14 @@ const validStatus = new Set([
 ]);
 const digits = (value: unknown) => String(value ?? "").replace(/\D/g, "");
 const machineIdPattern = /^[a-f0-9]{64}$/i;
+const onlineMachineStatuses = new Set(["active", "online", "connected", "conectado", "ativo"]);
+const disabledMachineStatuses = new Set(["inactive", "disabled", "inativo", "desativado"]);
+
+function machineEnabled(item: Record<string, unknown>) {
+  const status = String(item.status || "").trim().toLowerCase();
+  const active = String(item.active ?? "true").trim().toLowerCase();
+  return !["false", "0", "off", "no", "nao", "não"].includes(active) && !disabledMachineStatuses.has(status);
+}
 let templateAuditReady: Promise<void> | null = null;
 let regimeAuditReady: Promise<void> | null = null;
 let clientMachinesReady: Promise<void> | null = null;
@@ -194,7 +202,7 @@ function connectionQuery(dialect: string) {
   return "SELECT 1 AS connection_ok";
 }
 
-type ClientMachineOption = { machine_id: string; status: string; online: boolean; label: string; dialect: string };
+type ClientMachineOption = { machine_id: string; status: string; active: boolean; online: boolean; label: string; dialect: string };
 
 async function activeMachine(bearer: string, cnpj: string, requested = "") {
   let machines: ClientMachineOption[] = [];
@@ -205,15 +213,15 @@ async function activeMachine(bearer: string, cnpj: string, requested = "") {
     );
     if (response.ok) {
       const body = await response.json();
-      const onlineStatuses = new Set(["active", "online", "connected", "conectado"]);
       const candidates = (Array.isArray(body?.clients) ? body.clients : [])
         .filter((item: Record<string, unknown>) => digits(item.cnpj_cpf) === cnpj && machineIdPattern.test(String(item.machine_id || "")))
         .sort((a: Record<string, unknown>, b: Record<string, unknown>) => Date.parse(String(b.last_ping || b.connected_at || 0)) - Date.parse(String(a.last_ping || a.connected_at || 0)));
       machines = candidates.map((item: Record<string, unknown>) => {
         const status = String(item.status || "").trim().toLowerCase();
-        return { machine_id: String(item.machine_id), status: status || "sem status", online: onlineStatuses.has(status), label: String(item.name || item.company_name || item.razao_social || item.client_name || "Robo Integrador"), dialect: String(item.dialect || "") };
+        const active = machineEnabled(item);
+        return { machine_id: String(item.machine_id), status: status || "sem status", active, online: active && onlineMachineStatuses.has(status), label: String(item.name || item.company_name || item.razao_social || item.client_name || "Robo Integrador"), dialect: String(item.dialect || "") };
       });
-      const selected = requested ? machines.find((item) => item.machine_id === requested) : machines.find((item) => item.online);
+      const selected = requested ? machines.find((item) => item.machine_id === requested && item.online) : machines.find((item) => item.online);
       if (selected) return { machineId: selected.machine_id, dialect: selected.dialect, source: "api_integrador", machines };
     }
   } catch {}
@@ -954,45 +962,16 @@ async function handler(
           { detail: "INTEGRADOR_QUERY_BEARER nao configurado no servidor." },
           { status: 503 },
         );
-      let machineId = "";
-      let machineSource = "api_integrador";
-      let discoveredDialect = "";
-      try {
-        const machinesResponse = await fetch(
-          `https://api.mixfiscal.com.br/integrador/api/v1/clients/list?search=${job.rows[0].cnpj}&page_size=100`,
-          {
-            headers: { Authorization: `Bearer ${bearer}`, Accept: "application/json" },
-            cache: "no-store",
-            signal: AbortSignal.timeout(30000),
-          },
-        );
-        if (machinesResponse.ok) {
-          const machinesBody = await machinesResponse.json();
-          const candidates = (Array.isArray(machinesBody?.clients) ? machinesBody.clients : [])
-            .filter((item: Record<string, unknown>) =>
-              digits(item.cnpj_cpf) === job.rows[0].cnpj &&
-              machineIdPattern.test(String(item.machine_id || "")) &&
-              (item.active === true || ["active", "online", "connected", "conectado"].includes(String(item.status || "").toLowerCase())),
-            )
-            .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
-              Date.parse(String(b.last_ping || b.connected_at || 0)) - Date.parse(String(a.last_ping || a.connected_at || 0)),
-            );
-          if (candidates.length) {
-            machineId = String(candidates[0].machine_id);
-            discoveredDialect = String(candidates[0].dialect || "");
-          }
-        }
-      } catch {}
-      if (!machineId) {
-        machineId = String(body.machine_id || job.rows[0].machine_id || "").trim();
-        machineSource = body.machine_id ? "informado" : "salvo";
-      }
+      const requestedMachineId = String(body.machine_id || job.rows[0].machine_id || "").trim();
+      const machine = await activeMachine(bearer, job.rows[0].cnpj, requestedMachineId);
+      const machineId = machine.machineId;
+      const machineSource = "api_integrador";
       if (!machineIdPattern.test(machineId))
         return NextResponse.json(
-          { detail: "O Integrador nao retornou Machine ID ativo para este CNPJ." },
+          { detail: "O Machine ID esta desativado, offline ou nao pertence a este CNPJ." },
           { status: 422 },
         );
-      const dialect = String(discoveredDialect || body.dialect || job.rows[0].banco_tipo || "");
+      const dialect = String(machine.dialect || body.dialect || job.rows[0].banco_tipo || "");
       await query(
         `INSERT INTO public.client_machine_ids(owner_id,cnpj,machine_id,verificado_em,atualizado_por)
          VALUES($1,$2,$3,NOW(),$4)
