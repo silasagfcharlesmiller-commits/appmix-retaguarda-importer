@@ -80,7 +80,7 @@ Para gerar uma versão, leia [`PUBLICACAO.md`](PUBLICACAO.md) e use somente:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\PUBLICAR_ATUALIZACAO.ps1 `
-  -Versao 1.2.1 `
+  -Versao 1.2.2 `
   -Executavel "C:\caminho\desktop-integrador.exe"
 ```
 

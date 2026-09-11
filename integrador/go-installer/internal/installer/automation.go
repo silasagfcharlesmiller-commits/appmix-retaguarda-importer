@@ -215,8 +215,11 @@ func waitDebugPort(timeout time.Duration) error {
 
 func persistNativeID(page *CDPPage, machineID string) error {
 	script := fmt.Sprintf(`(async()=>{const id=%s;const settings=await window.go.app.App.GetLocalSettings();await window.go.app.App.SaveLocalSettings({...settings,machine_id:id});return await window.go.app.App.LoadSavedMachineID();})()`, jsQuote(machineID))
-	result, err := page.Evaluate(script)
-	if value, _ := result.(string); err != nil || value != machineID {
+	result, err := page.EvaluateRetry(script, 3, 700*time.Millisecond)
+	if err != nil {
+		return fail("Falha ao confirmar o Machine ID no Integrador: %v", err)
+	}
+	if value, _ := result.(string); value != machineID {
 		return fail("O Integrador não confirmou o Machine ID no disco.")
 	}
 	return nil
@@ -264,9 +267,9 @@ func openSettingsWithLogin(page *CDPPage, username, password string, progress fu
 
 func installFromSettings(page *CDPPage, progress func(string)) error {
 	progress("Instalando a inicialização automática")
-	value, err := page.Evaluate("window.go.app.App.GetWindowsServiceStatus()")
+	value, err := page.EvaluateRetry("window.go.app.App.GetWindowsServiceStatus()", 3, 700*time.Millisecond)
 	if err != nil {
-		return err
+		return fail("Falha ao consultar a inicialização automática do Integrador: %v", err)
 	}
 	status := fmt.Sprint(value)
 	if status == "not_installed" {
@@ -280,9 +283,9 @@ func installFromSettings(page *CDPPage, progress func(string)) error {
 	}
 	deadline := time.Now().Add(35 * time.Second)
 	for time.Now().Before(deadline) {
-		value, err = page.Evaluate("window.go.app.App.GetWindowsServiceStatus()")
+		value, err = page.EvaluateRetry("window.go.app.App.GetWindowsServiceStatus()", 3, 700*time.Millisecond)
 		if err != nil {
-			return err
+			return fail("Falha ao confirmar a inicialização automática do Integrador: %v", err)
 		}
 		status = fmt.Sprint(value)
 		if status == "running" {
@@ -307,6 +310,10 @@ func automateUI(cnpj, username, password, expectedID string, progress func(strin
 			return "", err
 		}
 	}
+	progress("Aguardando a interface do Integrador ficar pronta")
+	if err := page.WaitIntegratorBridge(35 * time.Second); err != nil {
+		return "", err
+	}
 	if page.VisiblePlaceholder("Email ou CPF/CNPJ", 0) {
 		progress("Autenticando no Integrador")
 		if err := page.FillPlaceholder("Email ou CPF/CNPJ", username, 0); err != nil {
@@ -321,11 +328,14 @@ func automateUI(cnpj, username, password, expectedID string, progress func(strin
 		if err := page.WaitPlaceholderHidden("Email ou CPF/CNPJ", 25*time.Second, 0); err != nil {
 			return "", err
 		}
+		if err := page.WaitIntegratorBridge(20 * time.Second); err != nil {
+			return "", err
+		}
 	}
 	progress("Aproveitando a identidade gerada pelo Integrador")
-	savedRaw, err := page.Evaluate("window.go.app.App.LoadSavedMachineID()")
+	savedRaw, err := page.EvaluateRetry("window.go.app.App.LoadSavedMachineID()", 3, 700*time.Millisecond)
 	if err != nil {
-		return "", err
+		return "", fail("Falha ao ler o Machine ID criado pelo Integrador: %v", err)
 	}
 	savedID, _ := savedRaw.(string)
 	machineID := ""

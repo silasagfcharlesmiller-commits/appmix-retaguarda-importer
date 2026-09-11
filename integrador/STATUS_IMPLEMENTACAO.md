@@ -4,7 +4,7 @@ Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 
 ## Candidata atual
 
-- versão: `1.2.1`;
+- versão: `1.2.2`;
 - interface: Go 1.26 + Wails 2 + HTML/CSS/JavaScript;
 - pacote: Inno Setup elevado;
 - runtime cliente: dois executáveis Go e um manifesto;
@@ -23,6 +23,8 @@ Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 - validação de payload por tamanho e SHA-256;
 - `desktop-integrador.exe` marcado como `RUNASADMIN`;
 - login inicial e segundo login em Configurações quando a tela pedir;
+- espera explícita da ponte Wails e repetição das consultas idempotentes, evitando que o atraso do
+  WebView2 seja mostrado como erro JavaScript após uma instalação parcial;
 - reaproveitamento idempotente do Machine ID existente;
 - geração única pela interface oficial quando nenhum ID existe;
 - preenchimento de CNPJ, serviço `mixfiscal`, Salvar e Instalar/Iniciar;
@@ -41,12 +43,12 @@ Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 - Inno Setup 6.7.3 gerou o pacote completo;
 - o verificador confirmou dois binários nativos e ausência de Python/PyQt/Playwright/Node;
 - a prévia do frontend foi renderizada em Edge/WebView e não apresentou cortes em 1100 × 850;
-- candidata `1.2.1` gerada pelo publicador canônico: 13.835.850 bytes;
-- SHA-256 do setup candidato: `7962C50F19DEF140988C1FD0241DF1493BB287F82DE01E0C632E1C43316F3985`.
+- candidata `1.2.2` gerada pelo publicador canônico: 13.830.157 bytes;
+- SHA-256 do setup candidato: `DF6184AE0E119DB63AEBF908707CECC8D2EDBA219CA4CA5DC138C119C7DCE4C7`.
 
 ## Antes de produção
 
-1. gerar `1.2.1` somente pelo comando de [`PUBLICACAO.md`](PUBLICACAO.md);
+1. gerar `1.2.2` somente pelo comando de [`PUBLICACAO.md`](PUBLICACAO.md);
 2. executar o teste completo autorizado em máquina cliente/VM;
 3. validar Windows 10/11 e Server 2016/2019/2022;
 4. testar uma máquina com WebView2 e outra sem;

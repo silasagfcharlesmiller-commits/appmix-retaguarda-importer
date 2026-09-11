@@ -21,6 +21,8 @@ type CDPPage struct {
 	URL        string
 }
 
+const integratorBridgePredicate = `document.readyState!=='loading'&&typeof window.go==='object'&&window.go.app&&window.go.app.App&&typeof window.go.app.App.LoadSavedMachineID==='function'&&typeof window.go.app.App.GetLocalSettings==='function'&&typeof window.go.app.App.SaveLocalSettings==='function'&&typeof window.go.app.App.EnsureMachineIDForNewClient==='function'&&typeof window.go.app.App.GetWindowsServiceStatus==='function'`
+
 func NewCDPPage(port int) (*CDPPage, error) {
 	client := &http.Client{Timeout: 4 * time.Second}
 	response, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/json/list", port))
@@ -93,11 +95,42 @@ func (page *CDPPage) Evaluate(expression string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if result["exceptionDetails"] != nil {
-		return nil, fail("A interface do Integrador recusou uma etapa JavaScript.")
+	if details := result["exceptionDetails"]; details != nil {
+		return nil, fail("A interface do Integrador recusou uma etapa: %s", cdpExceptionDescription(details))
 	}
 	remote, _ := result["result"].(map[string]any)
 	return remote["value"], nil
+}
+
+func (page *CDPPage) EvaluateRetry(expression string, attempts int, interval time.Duration) (any, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		value, err := page.Evaluate(expression)
+		if err == nil {
+			return value, nil
+		}
+		lastErr = err
+		if attempt+1 < attempts {
+			time.Sleep(interval)
+		}
+	}
+	return nil, lastErr
+}
+
+func cdpExceptionDescription(value any) string {
+	details, _ := value.(map[string]any)
+	if exception, ok := details["exception"].(map[string]any); ok {
+		if description := safeText(exception["description"], 500); description != "<nil>" && description != "" {
+			return description
+		}
+	}
+	if description := safeText(details["text"], 500); description != "<nil>" && description != "" {
+		return description
+	}
+	return "erro JavaScript sem detalhe informado pelo WebView2"
 }
 
 func (page *CDPPage) Navigate(target string) error {
@@ -120,6 +153,10 @@ func (page *CDPPage) Wait(predicate string, timeout time.Duration, message strin
 		time.Sleep(200 * time.Millisecond)
 	}
 	return fail("%s", message)
+}
+
+func (page *CDPPage) WaitIntegratorBridge(timeout time.Duration) error {
+	return page.Wait(integratorBridgePredicate, timeout, "O Integrador abriu, mas a ponte nativa ainda não ficou pronta. Tente novamente; o mesmo Machine ID será reaproveitado.")
 }
 
 func jsQuote(value string) string {
