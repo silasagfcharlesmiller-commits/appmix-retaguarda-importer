@@ -68,7 +68,7 @@ async function handler(request: NextRequest, context: { params: Promise<{ path: 
       const items=(await query(`SELECT t.id,t.nome,
         TRUE AS cadastrar_template,
         COALESCE(jsonb_array_length(CASE WHEN jsonb_typeof(s.dados_json->'paths')='array' THEN s.dados_json->'paths' ELSE '[]'::jsonb END)>0,FALSE) AS configuracao_xml,
-        CASE WHEN cfg.dados_json->>'modo_regras_fiscais'='automatico' THEN 'automatico' ELSE 'desativado' END AS regras_fiscais_uf,
+        CASE WHEN cfg.dados_json->>'modo_regras_fiscais' IN ('automatico','simulacao') THEN cfg.dados_json->>'modo_regras_fiscais' ELSE 'desativado' END AS regras_fiscais_uf,
         COALESCE(cfg.dados_json->'regimes_tributarios',jsonb_build_array(COALESCE(cfg.dados_json->>'regime_tributario','qualquer'))) AS regimes_tributarios,
         EXISTS(SELECT 1 FROM public.template_retaguarda_connections c WHERE c.template_id=t.id AND c.owner_id=$1 AND NULLIF(BTRIM(c.banco_nome),'') IS NOT NULL AND NULLIF(BTRIM(c.usuario),'') IS NOT NULL AND c.senha_encrypted IS NOT NULL) AS dados_conexao,
         COALESCE(NULLIF(BTRIM(s.dados_json->'scheduler'->>'command'),''),'')<>'' AS scheduler

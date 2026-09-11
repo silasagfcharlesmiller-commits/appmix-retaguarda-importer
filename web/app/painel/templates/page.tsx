@@ -21,6 +21,7 @@ import {
 
 type Meta = { id: number; nome: string };
 type WizardMode = "copy" | "blank";
+type GuidedStep = 0 | 1 | 2 | 3 | 4 | 5;
 type Fields = {
   view_nome: string;
   view_sql: string;
@@ -66,8 +67,7 @@ const blankConnection = (): RetaguardaConnection => ({
 type Data = {
   configuracao: {
     regimes_tributarios: string[]; descricao: string;
-    retaguarda: string;
-    modo_regras_fiscais: "desativado" | "automatico";
+    modo_regras_fiscais: "desativado" | "simulacao" | "automatico";
     excecoes_regras_fiscais: Record<string, FiscalBehavior>;
   };
   tabelas: Record<string, Fields>;
@@ -103,6 +103,44 @@ const taxes = [
   ["icms_entrada", "ICMS Entrada"],
   ["ibs_cbs", "IBS / CBS"],
 ];
+const guidedSetupSteps = [
+  {
+    title: "Tabelas VIEW e TMP",
+    description: "Revise os quatro grupos fiscais. Informe nomes, consultas e regras de gravação usadas por esta configuração.",
+    target: "template-tables",
+    optional: false,
+  },
+  {
+    title: "Comparar divergências",
+    description: "Escolha os campos monitorados e defina como as regras fiscais por UF devem se comportar.",
+    target: "comparar-divergencia",
+    optional: true,
+  },
+  {
+    title: "Padrão XML",
+    description: "Adicione pastas ou consultas SQL somente quando este template também configurar a captura de XML.",
+    target: "template-xml",
+    optional: true,
+  },
+  {
+    title: "Scheduler",
+    description: "Programe comandos automáticos por Machine ID. Deixe sem comando quando não precisar de agendamento.",
+    target: "template-scheduler",
+    optional: true,
+  },
+  {
+    title: "Dados de conexão",
+    description: "Cadastre banco, usuário e senha somente quando o template também instalar a conexão do robô.",
+    target: "template-connection",
+    optional: true,
+  },
+  {
+    title: "Revisar e salvar",
+    description: "Confira o resumo e salve todas as alterações do novo template.",
+    target: "template-final-save",
+    optional: false,
+  },
+] as const;
 const blank = (): Fields => ({
   view_nome: "",
   view_sql: "",
@@ -299,6 +337,14 @@ function setDeep(obj: Record<string, unknown>, path: string, value: boolean) {
         ((cur[k] = {}) as Record<string, unknown>);
   });
 }
+function countEnabled(obj: unknown): number {
+  if (obj === true) return 1;
+  if (!obj || typeof obj !== "object") return 0;
+  return Object.values(obj as Record<string, unknown>).reduce<number>(
+    (total, value) => total + countEnabled(value),
+    0,
+  );
+}
 
 export default function TemplatesPage() {
   const [items, setItems] = useState<Meta[]>([]),
@@ -328,10 +374,10 @@ export default function TemplatesPage() {
     [wizardSource, setWizardSource] = useState<number>(),
     [wizardName, setWizardName] = useState(""),
     [wizardDescription, setWizardDescription] = useState(""),
-    [wizardRetaguarda, setWizardRetaguarda] = useState(""),
     [wizardRegimes, setWizardRegimes] = useState<string[]>(["qualquer"]),
     [wizardCreating, setWizardCreating] = useState(false),
     [wizardError, setWizardError] = useState("");
+  const [guidedStep, setGuidedStep] = useState<GuidedStep | null>(null);
   async function list(select?: number) {
     const r = await fetch("/api/mix/v1/templates");
     const j = await r.json();
@@ -384,8 +430,9 @@ export default function TemplatesPage() {
                 ? saved
                 : [legacy || "qualquer"],
             descricao: String(j.dados?.configuracao?.descricao || ""),
-            retaguarda: String(j.dados?.configuracao?.retaguarda || ""),
-            modo_regras_fiscais: j.dados?.configuracao?.modo_regras_fiscais === "automatico" ? "automatico" : "desativado",
+            modo_regras_fiscais: ["automatico", "simulacao"].includes(j.dados?.configuracao?.modo_regras_fiscais)
+              ? j.dados.configuracao.modo_regras_fiscais
+              : "desativado",
             excecoes_regras_fiscais: j.dados?.configuracao?.excecoes_regras_fiscais || {},
           },
           tabelas: tables,
@@ -418,6 +465,25 @@ export default function TemplatesPage() {
       .then((j) => setConnection(j.item ? { ...blankConnection(), ...j.item, porta: String(j.item.porta), tamanho_max_mensagem: String(j.item.tamanho_max_mensagem || 4), senha: "" } : blankConnection()))
       .catch((error) => setMessage(error instanceof Error ? error.message : "Falha ao carregar a conexao."));
   }, [selected]);
+  const dataReady = Boolean(data);
+  useEffect(() => {
+    if (guidedStep === null || !dataReady) return;
+    setExpandAll(guidedStep === 0);
+    if (guidedStep === 1) {
+      setDivergenceOpen(true);
+      setOpenMasters(divergenceMasters.map((master) => master.key));
+    }
+    if (guidedStep === 2) setXmlOpen(true);
+    if (guidedStep === 3) setSchedulerOpen(true);
+    if (guidedStep === 4) setConnectionOpen(true);
+    const timer = window.setTimeout(() => {
+      document.getElementById(guidedSetupSteps[guidedStep].target)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [guidedStep, dataReady]);
   function field(tax: string, key: keyof Fields, value: string | boolean) {
     setData((d) =>
       d
@@ -495,7 +561,6 @@ export default function TemplatesPage() {
     setWizardSource(source);
     setWizardName("");
     setWizardDescription("");
-    setWizardRetaguarda("");
     setWizardRegimes(["qualquer"]);
     setWizardStep(copyCurrent ? 2 : 1);
     setWizardError("");
@@ -560,7 +625,6 @@ export default function TemplatesPage() {
             configuracao: {
               ...currentConfiguration,
               descricao: wizardDescription.trim(),
-              retaguarda: wizardRetaguarda.trim(),
               regimes_tributarios: wizardRegimes,
             },
           },
@@ -573,11 +637,7 @@ export default function TemplatesPage() {
       await list(createdId);
       if (isMaster) await loadAudit();
       setWizardOpen(false);
-      setMessage(
-        wizardMode === "copy"
-          ? "Template criado com a configuração da base. Revise os campos no editor abaixo."
-          : "Template vazio criado. Complete os campos necessários no editor abaixo.",
-      );
+      setGuidedStep(0);
     } catch (error) {
       if (createdId) {
         await list(createdId);
@@ -593,13 +653,16 @@ export default function TemplatesPage() {
     }
   }
   async function save() {
-    if (!selected || !data) return;
+    if (!selected || !data) return false;
     const r = await fetch(`/api/mix/v1/templates/${selected}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dados: data }),
     });
-    if (!r.ok) return setMessage((await r.json()).detail || "Nao foi possivel salvar o template.");
+    if (!r.ok) {
+      setMessage((await r.json()).detail || "Nao foi possivel salvar o template.");
+      return false;
+    }
     const connectionComplete = [connection.banco_nome, connection.usuario].every((value) => String(value ?? "").trim()) &&
       (Boolean(connection.senha_cadastrada) || Boolean(String(connection.senha ?? "").trim()));
     if (connectionComplete) {
@@ -607,11 +670,15 @@ export default function TemplatesPage() {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(connection),
       });
       const result = await connectionResponse.json();
-      if (!connectionResponse.ok) return setMessage(result.detail || "O template foi salvo, mas a conexao nao.");
+      if (!connectionResponse.ok) {
+        setMessage(result.detail || "O template foi salvo, mas a conexao nao.");
+        return false;
+      }
       setConnection({ ...connection, ...result.item, porta: String(result.item.porta), tamanho_max_mensagem: String(result.item.tamanho_max_mensagem || 4), senha: "" });
     }
     setMessage(connectionComplete ? "Template e dados de conexao salvos." : "Template salvo. Preencha banco, usuario e senha para salvar a conexao.");
     if (isMaster) await loadAudit();
+    return true;
   }
   async function remove() {
     const current = items.find((i) => i.id === selected);
@@ -700,7 +767,7 @@ export default function TemplatesPage() {
               <div>
                 <span className="eyebrow dark">CADASTRO GUIADO</span>
                 <h2 id="template-wizard-title">Novo template fiscal</h2>
-                <p>Configure o essencial agora e faça os ajustes técnicos depois.</p>
+                <p>Crie a base e continue por todas as configurações com orientação.</p>
               </div>
               <button type="button" onClick={closeWizard} aria-label="Fechar cadastro">
                 <X size={20} />
@@ -769,12 +836,8 @@ export default function TemplatesPage() {
                     <p>Essas informações ajudam a equipe a escolher a configuração correta.</p>
                   </div>
                   <div className="wizard-fields">
-                    <label>Nome do template
+                    <label className="wizard-name">Nome do template
                       <input autoFocus value={wizardName} maxLength={100} onChange={(event) => setWizardName(event.target.value)} placeholder="Ex.: Brajan — Lucro Presumido" required />
-                    </label>
-                    <label>Retaguarda
-                      <input value={wizardRetaguarda} onChange={(event) => setWizardRetaguarda(event.target.value)} list="template-retaguardas" placeholder="Ex.: Brajan" />
-                      <datalist id="template-retaguardas"><option value="Brajan"/><option value="Ecocentauro"/><option value="Monalisa"/><option value="VR"/></datalist>
                     </label>
                     <label className="wizard-description">Descrição de uso
                       <textarea rows={3} value={wizardDescription} maxLength={500} onChange={(event) => setWizardDescription(event.target.value)} placeholder="Explique quando a equipe deve usar este template." />
@@ -787,6 +850,15 @@ export default function TemplatesPage() {
                     <label><input type="checkbox" checked={wizardRegimes.includes("lucro_presumido")} onChange={(event) => toggleWizardRegime("lucro_presumido", event.target.checked)} /> Lucro Presumido</label>
                     <label><input type="checkbox" checked={wizardRegimes.includes("simples_nacional")} onChange={(event) => toggleWizardRegime("simples_nacional", event.target.checked)} /> Simples Nacional</label>
                   </fieldset>
+                  <div className="wizard-regime-help">
+                    <ShieldCheck size={20}/>
+                    <div>
+                      <strong>{wizardRegimes.includes("qualquer") ? "Todos: nenhuma trava por regime" : "Proteção por regime ativada"}</strong>
+                      <p>{wizardRegimes.includes("qualquer")
+                        ? "O template poderá ser enviado a qualquer cliente. O regime não marcará nem desmarcará campos automaticamente."
+                        : "Antes de alterar VIEW, TMP ou divergências, o worker compara o regime do cliente. Se não estiver nesta lista, o job fica bloqueado para confirmação e nenhuma configuração é aplicada."}</p>
+                    </div>
+                  </div>
                 </section>
               )}
 
@@ -799,12 +871,11 @@ export default function TemplatesPage() {
                   </div>
                   <div className="wizard-review">
                     <article><small>Nome</small><strong>{wizardName.trim() || "Não informado"}</strong></article>
-                    <article><small>Retaguarda</small><strong>{wizardRetaguarda.trim() || "Não informada"}</strong></article>
                     <article><small>Base</small><strong>{wizardMode === "copy" ? items.find((item) => item.id === wizardSource)?.nome || "Não selecionada" : "Template vazio"}</strong></article>
                     <article><small>Regime</small><strong>{wizardRegimes.includes("qualquer") ? "Todos" : wizardRegimes.map((item) => item === "lucro_real" ? "Lucro Real" : item === "lucro_presumido" ? "Lucro Presumido" : "Simples Nacional").join(", ")}</strong></article>
                     {wizardDescription.trim() && <article className="wide"><small>Descrição</small><strong>{wizardDescription.trim()}</strong></article>}
                   </div>
-                  <div className="wizard-next-note"><Check size={18}/><span><strong>Próximo passo</strong><small>Revise as VIEWs, TMPs, impostos e configurações opcionais no editor técnico.</small></span></div>
+                  <div className="wizard-next-note"><ArrowRight size={18}/><span><strong>O guia continuará após a criação</strong><small>Você passará por VIEW/TMP, divergências, XML, scheduler, conexão e revisão final. As etapas opcionais podem ficar vazias.</small></span></div>
                 </section>
               )}
 
@@ -858,8 +929,9 @@ export default function TemplatesPage() {
             <p>O mesmo template pode atender lojas de vários estados. Em cada job, a API identifica a UF real do CNPJ e o worker combina o template-base, a regra da UF e as exceções específicas da retaguarda.</p>
             <div className="fiscal-mode-options">
               <article><b>1</b><div><strong>Não aplicar — manter o template</strong><p>Todos os clientes recebem exatamente os checkboxes salvos no template, independentemente da UF.</p></div></article>
-              <article><b>2</b><div><strong>Aplicar automaticamente</strong><p>Cada CNPJ recebe as cinco flags conforme sua UF. Os demais impostos, VIEWs e TMPs continuam seguindo o template.</p></div></article>
-              <article><b>3</b><div><strong>Exceções do template</strong><p>“Sempre marcado” ou “Sempre desmarcado” tem prioridade sobre a UF apenas neste template. Os campos em “Seguir regra da UF” continuam automáticos.</p></div></article>
+              <article className="simulation"><b>2</b><div><strong>Simulação — recomendado no primeiro teste</strong><p>Calcula as cinco flags da UF e mostra no log o que mudaria, sem substituir esses campos no cliente.</p></div></article>
+              <article><b>3</b><div><strong>Aplicar automaticamente</strong><p>Cada CNPJ recebe as cinco flags conforme sua UF. Os demais impostos, VIEWs e TMPs continuam seguindo o template.</p></div></article>
+              <article><b>4</b><div><strong>Exceções do template</strong><p>“Sempre marcado” ou “Sempre desmarcado” tem prioridade sobre a UF apenas neste template. Os campos em “Seguir regra da UF” continuam automáticos.</p></div></article>
             </div>
             <p className="fiscal-help-note">Use “Pré-visualizar regras para a UF” para conferir o valor final e a origem de cada campo antes de salvar. Para incluir ou remover estados, abra <a href="/painel/regras-fiscais">Regras por UF</a>.</p>
             <button type="button" className="primary-button" onClick={() => setFiscalHelpOpen(false)}>Entendi</button>
@@ -917,7 +989,10 @@ export default function TemplatesPage() {
           Editar template existente
           <select
             value={selected || ""}
-            onChange={(e) => setSelected(Number(e.target.value))}
+            onChange={(e) => {
+              setGuidedStep(null);
+              setSelected(Number(e.target.value));
+            }}
           >
             <option value="" disabled>
               Selecione
@@ -931,10 +1006,6 @@ export default function TemplatesPage() {
         </label>
         {data && (
           <div className="checks flag-panel">
-            <label>
-              Retaguarda
-              <input value={data.configuracao.retaguarda} onChange={(event) => setData((current) => current ? { ...current, configuracao: { ...current.configuracao, retaguarda: event.target.value } } : current)} placeholder="Ex.: Brajan, Ecocentauro ou Monalisa" />
-            </label>
             <label>
               Descrição de uso
               <textarea rows={2} value={data.configuracao.descricao} onChange={(event) => setData((current) => current ? { ...current, configuracao: { ...current.configuracao, descricao: event.target.value } } : current)} placeholder="Explique quando este template deve ser utilizado." />
@@ -968,14 +1039,25 @@ export default function TemplatesPage() {
               )}
               change={(v) => toggleRegime("simples_nacional", v)}
             />
+            <div className="wizard-regime-help compact">
+              <ShieldCheck size={18}/>
+              <div>
+                <strong>{data.configuracao.regimes_tributarios.includes("qualquer") ? "Todos: nenhuma trava por regime" : "Proteção por regime ativada"}</strong>
+                <p>{data.configuracao.regimes_tributarios.includes("qualquer")
+                  ? "Pode ser usado em qualquer regime. Essa escolha não altera automaticamente os campos fiscais."
+                  : "O worker confere o regime antes de executar. Cliente fora da lista fica bloqueado para confirmação antes de qualquer alteração."}</p>
+              </div>
+            </div>
             <div className="fiscal-mode-heading"><strong>REGRAS FISCAIS POR UF</strong><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={15}/> Como funciona?</button></div>
             <label>Modo de aplicação
               <select value={data.configuracao.modo_regras_fiscais} onChange={(event) => setData((current) => current ? ({ ...current, configuracao: { ...current.configuracao, modo_regras_fiscais: event.target.value as Data["configuracao"]["modo_regras_fiscais"] } }) : current)}>
                 <option value="desativado">Não aplicar — manter o template</option>
+                <option value="simulacao">Simulação — calcular e registrar sem aplicar regras da UF</option>
                 <option value="automatico">Aplicar automaticamente</option>
               </select>
-              <small>O worker consulta a UF de cada CNPJ. Templates existentes permanecem desativados até você alterar esta opção.</small>
+              <small>O worker consulta a UF de cada CNPJ. Use Simulação para conferir no log quais regras estaduais seriam alteradas.</small>
             </label>
+            {data.configuracao.modo_regras_fiscais === "simulacao" && <div className="fiscal-simulation-banner"><ShieldCheck size={19}/><span><strong>SIMULAÇÃO ATIVA</strong><small>As regras automáticas da UF serão calculadas e registradas no log, mas não substituirão os campos deste template. As demais configurações escolhidas continuam sendo aplicadas normalmente.</small></span></div>}
             {data.configuracao.modo_regras_fiscais !== "desativado" && <label className="uf-preview-control"><span>PRÉ-VISUALIZAR REGRAS POR UF</span>
               <select value={previewUf} onChange={(event) => {
                 const uf = event.target.value;
@@ -1024,6 +1106,59 @@ export default function TemplatesPage() {
           ))}
         </div>
       </section>
+      {guidedStep !== null && data && (
+        <section className="template-guided-setup" aria-live="polite">
+          <div className="guided-setup-topline">
+            <span>CONFIGURAÇÃO GUIADA · ETAPA {guidedStep + 1} DE {guidedSetupSteps.length}</span>
+            {guidedSetupSteps[guidedStep].optional && <em>OPCIONAL</em>}
+          </div>
+          <div className="guided-setup-heading">
+            <div>
+              <h2>{guidedSetupSteps[guidedStep].title}</h2>
+              <p>{guidedSetupSteps[guidedStep].description}</p>
+            </div>
+            <button type="button" onClick={() => setGuidedStep(null)}><X size={16}/> Encerrar guia</button>
+          </div>
+
+          {guidedStep === 1 && (
+            <div className="guided-fiscal-modes">
+              <button type="button" className={data.configuracao.modo_regras_fiscais === "desativado" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"desativado"}})}>
+                <strong>Manter o template</strong><small>Usa somente as marcações salvas neste template.</small>
+              </button>
+              <button type="button" className={`simulation ${data.configuracao.modo_regras_fiscais === "simulacao" ? "selected" : ""}`} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"simulacao"}})}>
+                <strong>Simulação</strong><small>Mostra no log as mudanças da UF sem aplicá-las. Recomendado no primeiro teste.</small>
+              </button>
+              <button type="button" className={data.configuracao.modo_regras_fiscais === "automatico" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"automatico"}})}>
+                <strong>Aplicar automaticamente</strong><small>Substitui as cinco flags controladas conforme a UF do CNPJ.</small>
+              </button>
+            </div>
+          )}
+
+          {guidedStep === 5 && (
+            <div className="guided-final-summary">
+              <span><b>{Object.values(data.tabelas).filter((table) => table.view_nome || table.tmp_nome).length}</b><small>grupos VIEW/TMP preenchidos</small></span>
+              <span><b>{countEnabled(data.comparar_divergencia)}</b><small>campos de divergência marcados</small></span>
+              <span><b>{data.configuracao_xml.paths.length}</b><small>origens XML</small></span>
+              <span><b>{data.configuracao_xml.scheduler?.command ? "Sim" : "Não"}</b><small>scheduler configurado</small></span>
+              <span><b>{connection.banco_nome && connection.usuario ? "Sim" : "Não"}</b><small>conexão configurada</small></span>
+            </div>
+          )}
+
+          <div className="guided-setup-footer">
+            <div className="guided-step-dots">
+              {guidedSetupSteps.map((step, index) => <button type="button" key={step.title} className={index === guidedStep ? "current" : index < guidedStep ? "done" : ""} onClick={() => setGuidedStep(index as GuidedStep)} title={step.title}>{index + 1}</button>)}
+            </div>
+            <div>
+              {guidedStep > 0 && <button type="button" className="wizard-cancel" onClick={() => setGuidedStep((guidedStep - 1) as GuidedStep)}><ArrowLeft size={16}/> Voltar</button>}
+              {guidedStep < guidedSetupSteps.length - 1 ? (
+                <button type="button" className="primary-button compact" onClick={() => setGuidedStep((guidedStep + 1) as GuidedStep)}>{guidedSetupSteps[guidedStep].optional ? "Pular ou continuar" : "Continuar"} <ArrowRight size={16}/></button>
+              ) : (
+                <button type="button" className="primary-button compact" onClick={async () => { if (await save()) setGuidedStep(null); }}><Save size={16}/> Salvar e finalizar</button>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
       {!data ? (
         <div className="empty-editor">
           {loadingTemplate ? "Carregando template..." : "Selecione ou crie um template."}
@@ -1042,7 +1177,7 @@ export default function TemplatesPage() {
               </p>
             </div>
           </div>
-          <section className="tax-list">
+          <section className="tax-list" id="template-tables">
             {taxes.map(([key, label]) => {
               const f = data.tabelas[key];
               const visible = expandAll || open === key;
@@ -1286,7 +1421,7 @@ export default function TemplatesPage() {
             changePath={xmlPath}
           />
           <SchedulerEditor data={data.configuracao_xml} open={schedulerOpen} setOpen={setSchedulerOpen} change={xmlChange} />
-          <section className="divergence-card retaguarda-card">
+          <section className="divergence-card retaguarda-card" id="template-connection">
             <button className="divergence-title" type="button" onClick={() => setConnectionOpen(!connectionOpen)}>
               <div>
                 <span className="eyebrow dark">DADOS DE CONEXAO</span>
@@ -1337,7 +1472,7 @@ export default function TemplatesPage() {
               </div>
             )}
           </section>
-          <button className="primary-button save-bottom" onClick={save}>
+          <button className="primary-button save-bottom" id="template-final-save" onClick={save}>
             <Check size={18} /> Salvar todas as alterações
           </button>
         </>
@@ -1359,7 +1494,7 @@ function XmlEditor({
   changePath: (i: number, v: Record<string, unknown>) => void;
 }) {
   return (
-    <section className="divergence-card xml-template-card">
+    <section className="divergence-card xml-template-card" id="template-xml">
       <button
         className="divergence-title"
         type="button"
@@ -1500,7 +1635,7 @@ function SchedulerEditor({data, open, setOpen, change}: {data: XmlConfig; open: 
   const scheduler = data.scheduler || { command: "", schedule_time: "", recurrence_tag: "" };
   const update = (patch: Partial<NonNullable<XmlConfig["scheduler"]>>) => change({ scheduler: { ...scheduler, ...patch } });
   const ativo = Boolean(scheduler.command);
-  return <section className="divergence-card xml-template-card scheduler-template-card"><button className="divergence-title" type="button" onClick={() => setOpen(!open)}><div><span className="eyebrow teal">SCHEDULER</span><h2>Agendamento do template</h2><p>Opcional. Permite agendar comandos para cada Machine ID; sem horário usa o próximo minuto.</p></div>{open ? <ChevronUp /> : <ChevronDown />}</button>{open && <div className="xml-template-body"><div className="xml-options" style={{gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))"}}><label>Comando<select value={scheduler.command} onChange={e => e.target.value ? update({command:e.target.value,recurrence_tag:scheduler.recurrence_tag || "unica_vez"}) : change({scheduler:{command:"",schedule_time:"",recurrence_tag:""}})}><option value="">Nenhum</option><option>RESTART_NOW</option><option>UPDATE_DESKTOP_CLIENT</option><option>FORCE_RESEND_XML</option><option>PROCESS_XML_CLIENT</option></select></label><label>Horário (opcional)<input disabled={!ativo} type="time" value={ativo?schedulerTimeValue(scheduler.schedule_time):""} onChange={e => update({schedule_time:e.target.value})}/></label><label>Recorrência<select disabled={!ativo} value={ativo?(scheduler.recurrence_tag || "unica_vez"):""} onChange={e => update({recurrence_tag:e.target.value})}><option value="">—</option><option value="unica_vez">Única vez</option><option value="diaria">Diário</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option></select></label></div></div>}</section>;
+  return <section className="divergence-card xml-template-card scheduler-template-card" id="template-scheduler"><button className="divergence-title" type="button" onClick={() => setOpen(!open)}><div><span className="eyebrow teal">SCHEDULER</span><h2>Agendamento do template</h2><p>Opcional. Permite agendar comandos para cada Machine ID; sem horário usa o próximo minuto.</p></div>{open ? <ChevronUp /> : <ChevronDown />}</button>{open && <div className="xml-template-body"><div className="xml-options" style={{gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))"}}><label>Comando<select value={scheduler.command} onChange={e => e.target.value ? update({command:e.target.value,recurrence_tag:scheduler.recurrence_tag || "unica_vez"}) : change({scheduler:{command:"",schedule_time:"",recurrence_tag:""}})}><option value="">Nenhum</option><option>RESTART_NOW</option><option>UPDATE_DESKTOP_CLIENT</option><option>FORCE_RESEND_XML</option><option>PROCESS_XML_CLIENT</option></select></label><label>Horário (opcional)<input disabled={!ativo} type="time" value={ativo?schedulerTimeValue(scheduler.schedule_time):""} onChange={e => update({schedule_time:e.target.value})}/></label><label>Recorrência<select disabled={!ativo} value={ativo?(scheduler.recurrence_tag || "unica_vez"):""} onChange={e => update({recurrence_tag:e.target.value})}><option value="">—</option><option value="unica_vez">Única vez</option><option value="diaria">Diário</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option></select></label></div></div>}</section>;
 }
 function Field({
   label,

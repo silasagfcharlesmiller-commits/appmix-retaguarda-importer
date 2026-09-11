@@ -198,6 +198,10 @@
   grid-column: 1 / -1;
 }
 
+.wizard-name {
+  grid-column: 1 / -1;
+}
+
 .wizard-regimes {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -231,6 +235,265 @@
   height: 16px;
   margin: 0;
   accent-color: var(--green);
+}
+
+.wizard-regime-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  color: #174b88;
+  border: 1px solid #9bc4ee;
+  border-radius: 12px;
+  background: #f1f7ff;
+}
+
+.wizard-regime-help > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.wizard-regime-help > div {
+  display: grid;
+  gap: 4px;
+}
+
+.wizard-regime-help p {
+  margin: 0;
+  color: #52708e;
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.wizard-regime-help.compact {
+  grid-column: 1 / -1;
+  padding: 11px 12px;
+}
+
+.fiscal-simulation-banner {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 14px;
+  color: #8a4b08;
+  border: 1px solid #efb968;
+  border-radius: 11px;
+  background: #fff7e8;
+}
+
+.fiscal-simulation-banner > svg {
+  flex: 0 0 auto;
+}
+
+.fiscal-simulation-banner > span {
+  display: grid;
+  gap: 3px;
+}
+
+.fiscal-simulation-banner small {
+  color: #805b34;
+  font-weight: 550;
+  line-height: 1.45;
+}
+
+.fiscal-mode-options article.simulation {
+  border-color: #efb968;
+  background: #fff7e8;
+}
+
+.fiscal-mode-options article.simulation > b {
+  background: #c76d11;
+}
+
+.template-guided-setup {
+  position: sticky;
+  z-index: 15;
+  top: 12px;
+  display: grid;
+  gap: 13px;
+  margin: 0 0 20px;
+  padding: 17px 19px;
+  border: 1px solid color-mix(in srgb, var(--green) 42%, var(--line));
+  border-left: 5px solid var(--green);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--green) 5%, var(--white));
+  box-shadow: 0 16px 38px rgba(18, 69, 54, .14);
+}
+
+.guided-setup-topline {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--green);
+  font-size: .67rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.guided-setup-topline em {
+  padding: 3px 7px;
+  color: #805012;
+  border: 1px solid #e7bc76;
+  border-radius: 999px;
+  background: #fff4dc;
+  font-size: .6rem;
+  font-style: normal;
+  letter-spacing: .08em;
+}
+
+.guided-setup-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.guided-setup-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.guided-setup-heading h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.guided-setup-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.45;
+}
+
+.guided-setup-heading > button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  font-size: .71rem;
+  font-weight: 800;
+}
+
+.guided-fiscal-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.guided-fiscal-modes > button {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  text-align: left;
+}
+
+.guided-fiscal-modes > button small {
+  color: var(--muted);
+  font-size: .69rem;
+  line-height: 1.35;
+}
+
+.guided-fiscal-modes > button.selected {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 10%, var(--white));
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.guided-fiscal-modes > button.simulation {
+  border-color: #e7bc76;
+  background: #fff9ed;
+}
+
+.guided-fiscal-modes > button.simulation.selected {
+  color: #754007;
+  border-color: #d88928;
+  background: #fff1d5;
+  box-shadow: inset 0 0 0 1px #d88928;
+}
+
+.guided-final-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.guided-final-summary > span {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--white);
+}
+
+.guided-final-summary b {
+  color: var(--green);
+  font-size: 1rem;
+}
+
+.guided-final-summary small {
+  color: var(--muted);
+  font-size: .66rem;
+  line-height: 1.3;
+}
+
+.guided-setup-footer,
+.guided-setup-footer > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.guided-step-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.guided-step-dots button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--white);
+  font-size: .68rem;
+  font-weight: 850;
+}
+
+.guided-step-dots button.done {
+  color: var(--green);
+  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+  background: color-mix(in srgb, var(--green) 8%, var(--white));
+}
+
+.guided-step-dots button.current {
+  color: #fff;
+  border-color: var(--green);
+  background: var(--green);
+}
+
+#template-tables,
+#comparar-divergencia,
+#template-xml,
+#template-scheduler,
+#template-connection,
+#template-final-save {
+  scroll-margin-top: 245px;
 }
 
 .wizard-review {
@@ -323,6 +586,39 @@
   color: #a7ebcf;
 }
 
+[data-theme="dark"] .wizard-regime-help {
+  color: #b9dcff;
+  border-color: #315f91;
+  background: #14283a;
+}
+
+[data-theme="dark"] .wizard-regime-help p {
+  color: #9fc3e8;
+}
+
+[data-theme="dark"] .fiscal-simulation-banner,
+[data-theme="dark"] .fiscal-mode-options article.simulation {
+  color: #ffd79e;
+  border-color: #8c632b;
+  background: #382a18;
+}
+
+[data-theme="dark"] .fiscal-simulation-banner small {
+  color: #e8c793;
+}
+
+[data-theme="dark"] .guided-fiscal-modes > button.simulation {
+  border-color: #8c632b;
+  background: #382a18;
+}
+
+[data-theme="dark"] .guided-fiscal-modes > button.simulation.selected {
+  color: #ffe2b0;
+  border-color: #d99a43;
+  background: #49351a;
+  box-shadow: inset 0 0 0 1px #d99a43;
+}
+
 @media (max-width: 700px) {
   .template-wizard {
     width: 100%;
@@ -354,6 +650,7 @@
   }
 
   .wizard-description,
+  .wizard-name,
   .wizard-review article.wide {
     grid-column: auto;
   }
@@ -373,5 +670,39 @@
 
   .template-wizard-actions .primary-button {
     max-width: 68%;
+  }
+
+  .template-guided-setup {
+    position: relative;
+    top: auto;
+    padding: 15px;
+  }
+
+  .guided-setup-heading,
+  .guided-setup-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .guided-setup-heading > button {
+    align-self: flex-start;
+  }
+
+  .guided-fiscal-modes,
+  .guided-final-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .guided-setup-footer > div:last-child {
+    justify-content: flex-end;
+  }
+
+  #template-tables,
+  #comparar-divergencia,
+  #template-xml,
+  #template-scheduler,
+  #template-connection,
+  #template-final-save {
+    scroll-margin-top: 18px;
   }
 }

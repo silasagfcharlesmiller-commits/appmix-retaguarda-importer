@@ -768,9 +768,7 @@ async function handler(
     if (request.method === "PUT" && path[1] === "templates" && path[2]) {
       await ensureTemplateAudit();
       const body = await request.json();
-      if (body?.dados?.configuracao?.modo_regras_fiscais === "simulacao")
-        body.dados.configuracao.modo_regras_fiscais = "desativado";
-      if (body?.dados?.configuracao?.modo_regras_fiscais === "automatico")
+      if (["automatico", "simulacao"].includes(body?.dados?.configuracao?.modo_regras_fiscais))
         await ensureFiscalRules();
       const allowed = [
         "configuracao",
