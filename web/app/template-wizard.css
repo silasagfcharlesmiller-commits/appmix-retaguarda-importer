@@ -512,6 +512,101 @@
   background: #eeebff;
 }
 
+.template-step-dock {
+  position: fixed;
+  z-index: 34;
+  top: 50%;
+  display: grid;
+  gap: 7px;
+  width: 92px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, #6558d9 52%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--white) 94%, #6558d9);
+  box-shadow: 0 14px 34px rgba(47, 43, 112, .25);
+  transform: translateY(-50%);
+}
+
+.template-step-dock.dock-left {
+  left: 14px;
+}
+
+.template-step-dock.dock-right {
+  right: 14px;
+}
+
+.template-step-dock-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 4px;
+  color: #6558d9;
+  border: 1px dashed color-mix(in srgb, #6558d9 48%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, #6558d9 7%, var(--white));
+  cursor: grab;
+  font-size: .52rem;
+  font-weight: 900;
+  letter-spacing: .06em;
+}
+
+.template-step-dock-handle:active {
+  cursor: grabbing;
+}
+
+.template-step-dock nav {
+  display: grid;
+  gap: 5px;
+}
+
+.template-step-dock nav > button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  cursor: pointer;
+  text-align: left;
+}
+
+.template-step-dock nav > button:hover,
+.template-step-dock nav > button.current {
+  color: #fff;
+  border-color: #5748c7;
+  background: linear-gradient(135deg, #6558d9, #4778dc);
+}
+
+.template-step-dock nav b {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: .66rem;
+}
+
+.template-step-dock nav > button:hover b,
+.template-step-dock nav > button.current b {
+  color: #493cb7;
+  background: #eeebff;
+}
+
+.template-step-dock nav span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: .55rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .template-guided-setup .primary-button {
   background: linear-gradient(135deg, #6558d9, #4778dc);
   box-shadow: 0 9px 22px rgba(70, 67, 181, .24);
@@ -911,6 +1006,33 @@
   align-self: start;
 }
 
+.state-application-status {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 9px;
+  padding: 11px;
+  color: #176346;
+  border: 1px solid #8bd2b3;
+  border-radius: 9px;
+  background: #edfaf4;
+}
+
+.state-application-status > svg {
+  flex: 0 0 auto;
+}
+
+.state-application-status > span {
+  display: grid;
+  gap: 2px;
+}
+
+.state-application-status small {
+  color: #467764;
+  font-size: .68rem;
+  line-height: 1.4;
+}
+
 .state-grid-preview {
   align-self: start;
   padding: 10px;
@@ -936,6 +1058,10 @@
   display: grid;
   min-width: 0;
   gap: 4px;
+}
+
+.state-rule-field .uf-variable-check input:disabled {
+  opacity: 1;
 }
 
 .inline-fiscal-exception {
@@ -1258,6 +1384,18 @@
   box-shadow: 0 16px 42px rgba(0, 0, 0, .32);
 }
 
+[data-theme="dark"] .template-step-dock {
+  border-color: #5b5793;
+  background: #1f2037;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, .42);
+}
+
+[data-theme="dark"] .template-step-dock-handle {
+  color: #bcb7ff;
+  border-color: #625caf;
+  background: #292746;
+}
+
 [data-theme="dark"] .guided-setup-topline {
   color: #bcb7ff;
 }
@@ -1355,6 +1493,16 @@
   border-top-color: #315f91;
 }
 
+[data-theme="dark"] .state-application-status {
+  color: #a7ebcf;
+  border-color: #347b60;
+  background: #16372d;
+}
+
+[data-theme="dark"] .state-application-status small {
+  color: #8acbb2;
+}
+
 [data-theme="dark"] .inline-fiscal-exception {
   color: #d4c8ff;
   border-color: #625caf;
@@ -1367,6 +1515,46 @@
 }
 
 @media (max-width: 700px) {
+  .template-step-dock,
+  .template-step-dock.dock-left,
+  .template-step-dock.dock-right {
+    top: auto;
+    right: auto;
+    bottom: 10px;
+    left: 50%;
+    display: flex;
+    width: auto;
+    max-width: calc(100vw - 20px);
+    transform: translateX(-50%);
+  }
+
+  .template-step-dock-handle {
+    flex: 0 0 30px;
+    padding: 4px 2px;
+  }
+
+  .template-step-dock-handle span,
+  .template-step-dock nav span {
+    display: none;
+  }
+
+  .template-step-dock nav {
+    display: flex;
+    gap: 4px;
+  }
+
+  .template-step-dock nav > button {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 30px;
+    padding: 3px;
+  }
+
+  .template-step-dock nav b {
+    width: 22px;
+    height: 22px;
+  }
+
   .template-wizard {
     width: 100%;
     max-width: 100%;

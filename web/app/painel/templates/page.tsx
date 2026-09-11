@@ -9,6 +9,7 @@ import {
   Clock3,
   CircleHelp,
   Copy,
+  GripVertical,
   History,
   Plus,
   Save,
@@ -147,9 +148,9 @@ const guidedSetupSteps = [
     optional: true,
   },
   {
-    shortTitle: "Simular",
+    shortTitle: "Finalizar",
     title: "Conferir e finalizar",
-    description: "Confira a escolha. Se estiver usando regras por estado, simule uma UF antes de salvar.",
+    description: "Revise o resumo da configuração e salve o template quando estiver tudo certo.",
     target: "template-fiscal-simulation",
     optional: false,
   },
@@ -415,6 +416,7 @@ export default function TemplatesPage() {
     [wizardCreating, setWizardCreating] = useState(false),
     [wizardError, setWizardError] = useState("");
   const [guidedStep, setGuidedStep] = useState<GuidedStep | null>(null);
+  const [stepDockSide, setStepDockSide] = useState<"left" | "right">("right");
   const fiscalPreview = data && previewUf ? buildFiscalPreview(data, fiscalRules, previewUf) : [];
   const fiscalPreviewMarked = fiscalPreview.filter((item) => item.result).length;
   const fiscalPreviewChanges = fiscalPreview.filter((item) => item.current !== item.result).length;
@@ -444,6 +446,14 @@ export default function TemplatesPage() {
         setIsMaster(master);
         if (master) void loadAudit();
       });
+  }, []);
+  useEffect(() => {
+    try {
+      const savedSide = window.localStorage.getItem("template-step-dock");
+      if (savedSide === "left" || savedSide === "right") setStepDockSide(savedSide);
+    } catch {
+      // A barra continua funcionando mesmo quando o navegador bloqueia o armazenamento local.
+    }
   }, []);
   useEffect(() => {
     if (!selected) return;
@@ -479,7 +489,7 @@ export default function TemplatesPage() {
             ),
             descricao: String(j.dados?.configuracao?.descricao || ""),
             modo_regras_fiscais: ["automatico", "simulacao"].includes(j.dados?.configuracao?.modo_regras_fiscais)
-              ? j.dados.configuracao.modo_regras_fiscais
+              ? "automatico"
               : "desativado",
             excecoes_regras_fiscais: j.dados?.configuracao?.excecoes_regras_fiscais || {},
           },
@@ -606,9 +616,7 @@ export default function TemplatesPage() {
       ...data,
       configuracao: {
         ...data.configuracao,
-        modo_regras_fiscais: useStateRules
-          ? data.configuracao.modo_regras_fiscais === "desativado" ? "simulacao" : data.configuracao.modo_regras_fiscais
-        : "desativado",
+        modo_regras_fiscais: useStateRules ? "automatico" : "desativado",
       },
     });
     if (guidedStep !== null) setGuidedStep(5);
@@ -619,6 +627,14 @@ export default function TemplatesPage() {
       document.getElementById("comparar-divergencia")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 120);
   }
+  function moveStepDock(side: "left" | "right") {
+    setStepDockSide(side);
+    try {
+      window.localStorage.setItem("template-step-dock", side);
+    } catch {
+      // Mantém a posição durante a sessão quando o armazenamento local está indisponível.
+    }
+  }
   function showFiscalPreviewInGrid() {
     if (!previewUf) return;
     setDivergenceOpen(true);
@@ -626,12 +642,6 @@ export default function TemplatesPage() {
       setDivergenceOpen(true);
       setOpenMasters(["saida"]);
       document.getElementById("divergencia-saida")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
-  }
-  function returnToFiscalSimulation() {
-    setSimulationOpen(true);
-    window.setTimeout(() => {
-      document.getElementById("template-fiscal-simulation")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   }
   async function copyName(value: string) {
@@ -959,7 +969,7 @@ export default function TemplatesPage() {
                     <article><small>Regime</small><strong>{wizardRegimes.includes("qualquer") ? "Todos" : wizardRegimes.map((item) => item === "lucro_real" ? "Lucro Real" : item === "lucro_presumido" ? "Lucro Presumido" : "Simples Nacional").join(", ")}</strong></article>
                     {wizardDescription.trim() && <article className="wide"><small>Descrição</small><strong>{wizardDescription.trim()}</strong></article>}
                   </div>
-                  <div className="wizard-next-note"><ArrowRight size={18}/><span><strong>O guia continuará após a criação</strong><small>Você passará por VIEW/TMP, divergências, XML, scheduler, conexão, exceções e uma simulação final. As etapas opcionais podem ficar vazias.</small></span></div>
+                <div className="wizard-next-note"><ArrowRight size={18}/><span><strong>O guia continuará após a criação</strong><small>Você passará por VIEW/TMP, XML, scheduler, conexão, origem dos impostos, divergências e revisão final. As etapas opcionais podem ficar vazias.</small></span></div>
                 </section>
               )}
 
@@ -1160,6 +1170,36 @@ export default function TemplatesPage() {
           ))}
         </div>
       </section>
+      {data && (
+        <aside className={`template-step-dock dock-${stepDockSide}`} aria-label="Atalhos das etapas do template">
+          <button
+            type="button"
+            className="template-step-dock-handle"
+            draggable
+            title={`Arraste para o outro lado ou clique para mover para a ${stepDockSide === "right" ? "esquerda" : "direita"}`}
+            aria-label={`Mover atalhos para a ${stepDockSide === "right" ? "esquerda" : "direita"}`}
+            onClick={() => moveStepDock(stepDockSide === "right" ? "left" : "right")}
+            onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; }}
+            onDragEnd={(event) => moveStepDock(event.clientX < window.innerWidth / 2 ? "left" : "right")}
+          >
+            <GripVertical size={17}/><span>ARRASTE</span>
+          </button>
+          <nav>
+            {guidedSetupSteps.map((step, index) => (
+              <button
+                type="button"
+                key={step.title}
+                className={guidedStep === index ? "current" : ""}
+                title={`${index + 1}. ${step.title}`}
+                aria-label={`Abrir etapa ${index + 1}: ${step.title}`}
+                onClick={() => setGuidedStep(index as GuidedStep)}
+              >
+                <b>{index + 1}</b><span>{step.shortTitle}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+      )}
       {guidedStep !== null && data && (
         <section className="template-guided-setup" aria-live="polite">
           <div className="guided-setup-topline">
@@ -1195,7 +1235,7 @@ export default function TemplatesPage() {
               <span><b>{data.configuracao_xml.paths.length}</b><small>origens XML</small></span>
               <span><b>{data.configuracao_xml.scheduler?.command ? "Sim" : "Não"}</b><small>scheduler configurado</small></span>
               <span><b>{connection.banco_nome && connection.usuario ? "Sim" : "Não"}</b><small>conexão configurada</small></span>
-              <span><b>{data.configuracao.modo_regras_fiscais === "desativado" ? "Manual" : data.configuracao.modo_regras_fiscais === "simulacao" ? "Simular" : "Por estado"}</b><small>modo dos impostos</small></span>
+              <span><b>{data.configuracao.modo_regras_fiscais === "desativado" ? "Manual" : "Por estado"}</b><small>modo dos impostos</small></span>
             </div>
           )}
 
@@ -1422,7 +1462,7 @@ export default function TemplatesPage() {
               </div>
               {data.configuracao.modo_regras_fiscais === "desativado" ? (
                 <div className="manual-rule-confirmation"><Check size={19}/><span><strong>Configuração simples selecionada</strong><small>Marque os campos diretamente na grade. Regras estaduais e exceções não serão usadas.</small></span></div>
-              ) : <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>A grade foi aberta no ICMS de Saída. Configure ali a simulação e, se necessário, a exceção de cada imposto.</small></span><button type="button" onClick={() => selectFiscalSource(true)}>Abrir grade</button></div>}
+              ) : <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>A grade foi aberta no ICMS de Saída. Confira ali a prévia e, se necessário, a exceção de cada imposto.</small></span><button type="button" onClick={() => selectFiscalSource(true)}>Abrir grade</button></div>}
             </div>}
           </section>
           <section className="divergence-card" id="comparar-divergencia">
@@ -1439,14 +1479,11 @@ export default function TemplatesPage() {
             </button>
             {divergenceOpen && (
               <>
-                {previewUf ? <div className="preview-result-banner"><MapPinned size={18}/><span><strong>Você está vendo a prévia de {previewUf}</strong><small>As caixas azuis mostram o resultado da regra estadual, sem alterar a marcação original do template.</small></span><div className="preview-result-actions"><button type="button" onClick={() => setPreviewUf("")}>Voltar às marcações originais</button><button type="button" onClick={returnToFiscalSimulation}>Voltar à etapa Simular</button></div></div>
+                {previewUf ? <div className="preview-result-banner"><MapPinned size={18}/><span><strong>Você está vendo a prévia de {previewUf}</strong><small>As caixas azuis mostram o resultado da regra estadual, sem alterar a configuração do template.</small></span><div className="preview-result-actions"><button type="button" onClick={() => setPreviewUf("")}>Encerrar prévia</button></div></div>
                   : <div className="compare-base-help"><Check size={18}/><span><strong>Marque aqui o padrão do template</strong><small>Os campos laranja possuem regra por estado. Um campo roxo é uma exceção: ele mantém o valor escolhido no template e ignora a regra estadual.</small></span></div>}
                 {data.configuracao.modo_regras_fiscais !== "desativado" && <div className="state-grid-controls">
-                  <div className="state-grid-heading"><span><strong>Regra por estado ativa nesta grade</strong><small>Escolha se os jobs apenas simulam ou se já aplicam. Depois selecione uma UF para visualizar.</small></span><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={15}/> Ajuda</button></div>
-                  <div className="rule-run-options">
-                    <button type="button" className={data.configuracao.modo_regras_fiscais === "simulacao" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"simulacao"}})}><ShieldCheck size={18}/><span><strong>Somente simular</strong><small>Calcula e registra, sem alterar o cliente.</small></span></button>
-                    <button type="button" className={data.configuracao.modo_regras_fiscais === "automatico" ? "selected" : ""} onClick={() => setData({...data, configuracao:{...data.configuracao, modo_regras_fiscais:"automatico"}})}><Check size={18}/><span><strong>Aplicar nos jobs</strong><small>Grava o resultado estadual no cliente.</small></span></button>
-                  </div>
+                  <div className="state-grid-heading"><span><strong>Regra por estado ativa nesta grade</strong><small>Os cinco impostos laranja serão controlados pela UF do CNPJ. Use a prévia para conferir antes de salvar.</small></span><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={15}/> Ajuda</button></div>
+                  <div className="state-application-status"><Check size={18}/><span><strong>Aplicar regra nos jobs</strong><small>A prévia abaixo apenas mostra o resultado; o estado real será consultado durante cada job.</small></span></div>
                   <label className="state-grid-preview">UF para prévia visual<select value={previewUf} onChange={(event) => { const uf = event.target.value; setPreviewUf(uf); if (uf) { setOpenMasters(["saida"]); window.setTimeout(() => document.getElementById("divergencia-saida")?.scrollIntoView({behavior:"smooth", block:"start"}), 120); } }}><option value="">Sem prévia — mostrar marcações originais</option>{Object.keys(fiscalRules).sort().map((uf) => <option key={uf}>{uf}</option>)}</select><small>A UF é usada somente para visualizar. O job consulta o estado real do CNPJ.</small></label>
                   <p><strong>Exceção:</strong> nos cinco campos laranja, escolha “manter marcado” ou “manter desmarcado” para aquele imposto ignorar a regra estadual.</p>
                 </div>}
@@ -1517,6 +1554,7 @@ export default function TemplatesPage() {
                                           ? (templateOverride === "aplicar" || templateOverride === "desativar" ? templateOverride : stateBehavior) : "herdar";
                                         const controlled = behavior === "aplicar" || behavior === "desativar";
                                         const overrideControlled = controlled && hasTemplateException;
+                                        const stateRuleMarked = Boolean(fiscalField) && data.configuracao.modo_regras_fiscais !== "desativado" && !previewUf && !hasTemplateException;
                                         return (
                                           <div key={full} className={`divergence-field-control ${fiscalField ? "state-rule-field" : ""}`}>
                                             <CheckBox
@@ -1525,12 +1563,12 @@ export default function TemplatesPage() {
                                                 .pop()!
                                                 .replaceAll("_", " ")
                                                 .toUpperCase()}
-                                              checked={controlled ? behavior === "aplicar" : getDeep(data.comparar_divergencia, full)}
-                                              disabled={controlled}
+                                              checked={controlled ? behavior === "aplicar" : stateRuleMarked ? true : getDeep(data.comparar_divergencia, full)}
+                                              disabled={controlled || stateRuleMarked}
                                               highlighted={controlled}
                                               exceptionHighlighted={overrideControlled}
-                                              stateVariable={Boolean(fiscalField)}
-                                              hint={controlled ? overrideControlled ? `EXCEÇÃO: manter ${behavior === "aplicar" ? "marcado" : "desmarcado"} · regra do estado ignorada` : `PRÉVIA: ${behavior === "aplicar" ? "Marcado" : "Desmarcado"} · Regra de ${previewUf}` : fiscalField ? "Regra por estado · marque o padrão do template" : undefined}
+                                              stateVariable={Boolean(fiscalField) && data.configuracao.modo_regras_fiscais !== "desativado"}
+                                              hint={controlled ? overrideControlled ? `EXCEÇÃO: manter ${behavior === "aplicar" ? "marcado" : "desmarcado"} · regra do estado ignorada` : `PRÉVIA: ${behavior === "aplicar" ? "Marcado" : "Desmarcado"} · Regra de ${previewUf}` : stateRuleMarked ? "Regra por estado ativa" : undefined}
                                               change={(v) => {
                                                 const next = structuredClone(
                                                   data.comparar_divergencia,
@@ -1569,7 +1607,7 @@ export default function TemplatesPage() {
               <div>
                 <span className="eyebrow orange">ÚLTIMA ETAPA</span>
                 <h2>Conferir e salvar</h2>
-                <p>Se estiver usando regra por estado, você pode simular uma UF e conferir as marcações na grade.</p>
+                <p>Revise a origem dos impostos e as configurações feitas antes de salvar.</p>
               </div>
               {simulationOpen ? <ChevronUp/> : <ChevronDown/>}
             </button>
@@ -1577,8 +1615,8 @@ export default function TemplatesPage() {
               {data.configuracao.modo_regras_fiscais === "desativado" ? (
                 <div className="final-manual-summary"><Check size={22}/><span><strong>Usar conforme marquei</strong><small>O template está pronto para salvar. Todos os impostos seguirão exatamente as marcações feitas em Comparar divergências; nenhuma regra estadual ou exceção será usada.</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(4); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Mudar para regra por estado</button></div>
               ) : <>
-                <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>{data.configuracao.modo_regras_fiscais === "simulacao" ? "Os próximos jobs apenas calcularão e registrarão o resultado no log." : "Os próximos jobs aplicarão no cliente o resultado da UF real do CNPJ."}</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(4); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Alterar modo ou exceções</button></div>
-                <div className="final-state-summary"><span><strong>{previewUf ? `Prévia de ${previewUf} configurada` : "Prévia visual ainda não selecionada"}</strong><small>{previewUf ? `${fiscalPreviewMarked} marcados, ${fiscalPreview.length - fiscalPreviewMarked} desmarcados e ${fiscalPreviewChanges} mudanças aparecem na própria grade.` : "A UF, a simulação e as exceções são configuradas diretamente em Comparar divergências."}</small></span><button type="button" className="fiscal-grid-preview-button" onClick={() => previewUf ? showFiscalPreviewInGrid() : selectFiscalSource(true)}><MapPinned size={17}/> Abrir Comparar divergências</button></div>
+                <div className="state-rule-status"><MapPinned size={20}/><span><strong>Regra por estado selecionada</strong><small>Os próximos jobs aplicarão no cliente o resultado da UF real do CNPJ.</small></span><button type="button" onClick={() => { if (guidedStep !== null) setGuidedStep(4); else { setExceptionsOpen(true); document.getElementById("template-fiscal-overrides")?.scrollIntoView({behavior:"smooth"}); } }}>Alterar origem ou exceções</button></div>
+                <div className="final-state-summary"><span><strong>{previewUf ? `Prévia de ${previewUf} configurada` : "Prévia visual ainda não selecionada"}</strong><small>{previewUf ? `${fiscalPreviewMarked} marcados, ${fiscalPreview.length - fiscalPreviewMarked} desmarcados e ${fiscalPreviewChanges} mudanças aparecem na própria grade.` : "A UF, a prévia e as exceções são configuradas diretamente em Comparar divergências."}</small></span><button type="button" className="fiscal-grid-preview-button" onClick={() => previewUf ? showFiscalPreviewInGrid() : selectFiscalSource(true)}><MapPinned size={17}/> Abrir Comparar divergências</button></div>
               </>}
             </div>}
           </section>
