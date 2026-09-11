@@ -19,8 +19,6 @@ import (
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"golang.org/x/sys/windows/svc"
-	"golang.org/x/sys/windows/svc/mgr"
 )
 
 const (
@@ -158,18 +156,12 @@ func ProbeDirectory(path string) error {
 }
 
 func taskSchedulerRunning() bool {
-	manager, err := mgr.Connect()
-	if err != nil {
-		return false
-	}
-	defer manager.Disconnect()
-	service, err := manager.OpenService("Schedule")
-	if err != nil {
-		return false
-	}
-	defer service.Close()
-	status, err := service.Query()
-	return err == nil && status.State == svc.Running
+	output, err := hiddenCommand("sc.exe", "query", "Schedule").CombinedOutput()
+	return err == nil && schedulerOutputRunning(string(output))
+}
+
+func schedulerOutputRunning(output string) bool {
+	return strings.Contains(strings.ToUpper(output), "RUNNING")
 }
 
 func probeTaskScheduler() error {

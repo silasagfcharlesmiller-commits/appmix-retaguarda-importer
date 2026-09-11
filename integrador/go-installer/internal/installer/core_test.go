@@ -62,6 +62,15 @@ func TestVersionComparison(t *testing.T) {
 	}
 }
 
+func TestSchedulerOutputRunning(t *testing.T) {
+	if !schedulerOutputRunning("ESTADO : 4 RUNNING") {
+		t.Fatal("serviço Schedule em execução não foi reconhecido")
+	}
+	if schedulerOutputRunning("STATE : 1 STOPPED") {
+		t.Fatal("serviço Schedule parado foi aceito")
+	}
+}
+
 func TestFindLocalMachineIDReusesOneIdentityAndRejectsConflict(t *testing.T) {
 	root := t.TempDir()
 	appData := filepath.Join(root, "appdata")

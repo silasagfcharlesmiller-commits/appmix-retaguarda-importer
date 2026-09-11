@@ -1,7 +1,7 @@
 # Arquitetura do Instalador do Integrador Mix Fiscal
 
 Referência técnica atualizada em **2026-09-10** para a branch
-`integrador-v1.2-go-wails`, candidata `1.2.0`. Antes de gerar ou publicar, leia também
+`integrador-v1.2-go-wails`, candidata `1.2.1`. Antes de gerar ou publicar, leia também
 [`PUBLICACAO.md`](PUBLICACAO.md) e confirme o branch e o `git status`.
 
 ## Decisão de tecnologia

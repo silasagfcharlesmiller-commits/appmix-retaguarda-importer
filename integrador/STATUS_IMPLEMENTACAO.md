@@ -4,7 +4,7 @@ Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 
 ## Candidata atual
 
-- versão: `1.2.0`;
+- versão: `1.2.1`;
 - interface: Go 1.26 + Wails 2 + HTML/CSS/JavaScript;
 - pacote: Inno Setup elevado;
 - runtime cliente: dois executáveis Go e um manifesto;
@@ -18,6 +18,8 @@ Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 - tela responsiva com CNPJ, login, senha com olho, diagnóstico e versões;
 - atualização do próprio instalador ao abrir;
 - diagnóstico da conta interativa/elevada, AppData, TEMP e Agendador;
+- detecção do serviço `Schedule` pelo estado `RUNNING` retornado pelo Windows, corrigindo o falso
+  bloqueio observado na `1.2.0`;
 - validação de payload por tamanho e SHA-256;
 - `desktop-integrador.exe` marcado como `RUNASADMIN`;
 - login inicial e segundo login em Configurações quando a tela pedir;
@@ -39,12 +41,12 @@ Atualizado em 2026-09-10 na branch `integrador-v1.2-go-wails`.
 - Inno Setup 6.7.3 gerou o pacote completo;
 - o verificador confirmou dois binários nativos e ausência de Python/PyQt/Playwright/Node;
 - a prévia do frontend foi renderizada em Edge/WebView e não apresentou cortes em 1100 × 850;
-- candidata `1.2.0` gerada pelo publicador canônico: 13.839.118 bytes;
-- SHA-256 do setup candidato: `5A95E8C7DF5BA4497AC369BC1FCA7BCE3165DE2EC3608064639028FEF1AAD116`.
+- candidata `1.2.1` gerada pelo publicador canônico: 13.835.850 bytes;
+- SHA-256 do setup candidato: `7962C50F19DEF140988C1FD0241DF1493BB287F82DE01E0C632E1C43316F3985`.
 
 ## Antes de produção
 
-1. gerar `1.2.0` somente pelo comando de [`PUBLICACAO.md`](PUBLICACAO.md);
+1. gerar `1.2.1` somente pelo comando de [`PUBLICACAO.md`](PUBLICACAO.md);
 2. executar o teste completo autorizado em máquina cliente/VM;
 3. validar Windows 10/11 e Server 2016/2019/2022;
 4. testar uma máquina com WebView2 e outra sem;
