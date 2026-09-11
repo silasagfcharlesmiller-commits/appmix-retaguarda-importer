@@ -171,15 +171,6 @@ func (installer *Installer) StartIntegratorVerified(diagnostics *Diagnostics, pr
 	return nil
 }
 
-func (installer *Installer) EnsureIntegratorOpenVerified(diagnostics *Diagnostics, progress func(string)) error {
-	if installer.IntegratorRunning() {
-		progress("Integrador mantido aberto e autenticado para conferência")
-		diagnostics.Event("processo", "ok", "Integrador mantido aberto com a sessão usada na instalação", nil)
-		return nil
-	}
-	return installer.StartIntegratorVerified(diagnostics, progress)
-}
-
 type debugRestore struct {
 	key      registry.Key
 	existed  bool
@@ -229,6 +220,19 @@ func waitDebugPort(timeout time.Duration) error {
 	return fail("O WebView2 não abriu a porta temporária de automação.")
 }
 
+func waitDebugPortClosed(timeout time.Duration) {
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		response, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/json/version", debugPort))
+		if err != nil {
+			return
+		}
+		response.Body.Close()
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 func persistNativeID(page *CDPPage, machineID string) error {
 	script := fmt.Sprintf(`(async()=>{const id=%s;const settings=await window.go.app.App.GetLocalSettings();await window.go.app.App.SaveLocalSettings({...settings,machine_id:id});return await window.go.app.App.LoadSavedMachineID();})()`, jsQuote(machineID))
 	result, err := page.EvaluateRetry(script, 3, 700*time.Millisecond)
@@ -239,6 +243,26 @@ func persistNativeID(page *CDPPage, machineID string) error {
 		return fail("O Integrador não confirmou o Machine ID no disco.")
 	}
 	return nil
+}
+
+func authenticateIntegrator(page *CDPPage, username, password string, progress func(string)) error {
+	if !page.VisiblePlaceholder("Email ou CPF/CNPJ", 0) {
+		return nil
+	}
+	progress("Autenticando no Integrador")
+	if err := page.FillPlaceholder("Email ou CPF/CNPJ", username, 0); err != nil {
+		return err
+	}
+	if err := page.FillPassword(password); err != nil {
+		return err
+	}
+	if err := page.ClickText("Entrar", "button", false); err != nil {
+		return err
+	}
+	if err := page.WaitPlaceholderHidden("Email ou CPF/CNPJ", 25*time.Second, 0); err != nil {
+		return err
+	}
+	return page.WaitIntegratorBridge(20 * time.Second)
 }
 
 func openSettingsWithLogin(page *CDPPage, username, password string, progress func(string)) error {
@@ -279,6 +303,51 @@ func openSettingsWithLogin(page *CDPPage, username, password string, progress fu
 		}
 	}
 	return page.WaitText("Configurações", 25*time.Second, "h1,h2,h3")
+}
+
+func (installer *Installer) OpenIntegratorAuthenticatedForReview(username, password string, diagnostics *Diagnostics, progress func(string)) error {
+	progress("Reabrindo o Integrador para conferência final")
+	restore, err := enableTemporaryWebViewDebug()
+	if err != nil {
+		return err
+	}
+	defer restore.Close()
+
+	// A instalação das tarefas pode encerrar ou substituir o processo usado pela
+	// primeira automação. Abra uma instância nova na sessão interativa e autentique-a.
+	_ = installer.StopIntegrator()
+	waitDebugPortClosed(5 * time.Second)
+	if err := installer.StartIntegratorVerified(diagnostics, progress); err != nil {
+		return err
+	}
+	if err := waitDebugPort(30 * time.Second); err != nil {
+		return err
+	}
+	page, err := NewCDPPage(debugPort)
+	if err != nil {
+		return err
+	}
+	defer page.Close()
+	if page.URL == "about:blank" {
+		if err := page.Navigate("http://wails.localhost/"); err != nil {
+			return err
+		}
+	}
+	if err := page.WaitIntegratorBridge(35 * time.Second); err != nil {
+		return err
+	}
+	if err := authenticateIntegrator(page, username, password, progress); err != nil {
+		return fail("O Integrador foi instalado, mas o login da abertura final falhou: %v", err)
+	}
+	if err := openSettingsWithLogin(page, username, password, progress); err != nil {
+		return fail("O Integrador foi instalado e autenticado, mas não permaneceu em Configurações: %v", err)
+	}
+	if !installer.IntegratorRunning() {
+		return fail("O Integrador foi autenticado, mas encerrou antes da conferência final.")
+	}
+	progress("Integrador aberto, autenticado e em Configurações")
+	diagnostics.Event("processo", "ok", "Integrador reaberto, autenticado e mantido na tela de Configurações", nil)
+	return nil
 }
 
 func installFromSettings(page *CDPPage, progress func(string)) error {
@@ -340,23 +409,8 @@ func automateUI(cnpj, username, password, expectedID string, progress func(strin
 	if err := page.WaitIntegratorBridge(35 * time.Second); err != nil {
 		return "", err
 	}
-	if page.VisiblePlaceholder("Email ou CPF/CNPJ", 0) {
-		progress("Autenticando no Integrador")
-		if err := page.FillPlaceholder("Email ou CPF/CNPJ", username, 0); err != nil {
-			return "", err
-		}
-		if err := page.FillPassword(password); err != nil {
-			return "", err
-		}
-		if err := page.ClickText("Entrar", "button", false); err != nil {
-			return "", err
-		}
-		if err := page.WaitPlaceholderHidden("Email ou CPF/CNPJ", 25*time.Second, 0); err != nil {
-			return "", err
-		}
-		if err := page.WaitIntegratorBridge(20 * time.Second); err != nil {
-			return "", err
-		}
+	if err := authenticateIntegrator(page, username, password, progress); err != nil {
+		return "", err
 	}
 	progress("Aproveitando a identidade gerada pelo Integrador")
 	savedRaw, err := page.EvaluateRetry("window.go.app.App.LoadSavedMachineID()", 3, 700*time.Millisecond)
@@ -544,7 +598,7 @@ func (installer *Installer) runInstall(cnpj, username, password string, diagnost
 		return InstallResult{}, machineID, err
 	}
 	diagnostics.Event("cadastro", "ok", "CNPJ, serviço Mix Fiscal e Machine ID confirmados", nil)
-	if err := installer.EnsureIntegratorOpenVerified(diagnostics, progress); err != nil {
+	if err := installer.OpenIntegratorAuthenticatedForReview(username, password, diagnostics, progress); err != nil {
 		return InstallResult{}, machineID, err
 	}
 	return InstallResult{CNPJ: normalizedCNPJ, MachineID: machineID, Monitor: monitorTask}, machineID, nil

@@ -4,7 +4,7 @@ Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
 
 ## Candidata atual
 
-- versão: `1.2.3`;
+- versão: `1.2.4`;
 - interface: Go 1.26 + Wails 2 + HTML/CSS/JavaScript;
 - pacote: Inno Setup elevado;
 - runtime cliente: dois executáveis Go e um manifesto;
@@ -28,8 +28,8 @@ Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
 - reaproveitamento idempotente do Machine ID existente;
 - geração única pela interface oficial quando nenhum ID existe;
 - preenchimento de CNPJ, serviço `mixfiscal`, Salvar e Instalar/Iniciar;
-- preservação da mesma sessão autenticada do Integrador, aberta no final e também em falhas
-  posteriores para conferência manual;
+- reabertura final controlada na sessão visível, com novo login, entrada em **Configurações**,
+  segundo login quando solicitado e manutenção dessa tela aberta para conferência;
 - monitor instalado por `Painel_Mix.bat --install-monitor` e tarefa consultada;
 - confirmação de CNPJ, serviço e Machine ID exato na API e espera pelo status online;
 - logs sem credenciais e indicação de ocorrências relacionadas do Microsoft Defender;
@@ -45,9 +45,9 @@ Atualizado em 2026-09-11 na branch `integrador-v1.2-go-wails`.
 - Inno Setup 6.7.3 gerou o pacote completo;
 - o verificador confirmou dois binários nativos e ausência de Python/PyQt/Playwright/Node;
 - a prévia do frontend foi renderizada em Edge/WebView e não apresentou cortes em 1100 × 850;
-- candidata `1.2.3` gerada pelo publicador canônico: 13.834.342 bytes;
-- SHA-256 do setup candidato: `D5E90CCC4DBD665BF36319371FAF9E718168985740A3F362C349343F2428D539`;
-- Microsoft Defender não encontrou ameaças no setup candidato.
+- candidata `1.2.4` gerada pelo publicador canônico: 13.837.727 bytes;
+- SHA-256 do setup candidato: `EB1FCC0BA40FA1713E569D242CA98287095341390B9E56794567D0CD07BC2169`;
+- Microsoft Defender não encontrou ameaças no setup candidato;
 
 ## Antes de produção
 

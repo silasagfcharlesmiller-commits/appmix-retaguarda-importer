@@ -39,7 +39,7 @@ Use somente `PUBLICAR_ATUALIZACAO.ps1`, trocando a versão e o executável ofici
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\integrador\PUBLICAR_ATUALIZACAO.ps1 `
-  -Versao 1.2.3 `
+  -Versao 1.2.4 `
   -Executavel "C:\caminho\desktop-integrador.exe"
 ```
 
