@@ -321,18 +321,18 @@
   gap: 13px;
   margin: 0 0 20px;
   padding: 17px 19px;
-  border: 1px solid color-mix(in srgb, var(--green) 42%, var(--line));
-  border-left: 5px solid var(--green);
+  border: 1px solid color-mix(in srgb, #6558d9 58%, var(--line));
+  border-left: 6px solid #6558d9;
   border-radius: 15px;
-  background: color-mix(in srgb, var(--green) 5%, var(--white));
-  box-shadow: 0 16px 38px rgba(18, 69, 54, .14);
+  background: linear-gradient(135deg, color-mix(in srgb, #6558d9 12%, var(--white)), color-mix(in srgb, #2096d3 7%, var(--white)));
+  box-shadow: 0 16px 40px rgba(65, 61, 160, .2);
 }
 
 .guided-setup-topline {
   display: flex;
   align-items: center;
   gap: 9px;
-  color: var(--green);
+  color: #5748c7;
   font-size: .67rem;
   font-weight: 900;
   letter-spacing: .1em;
@@ -495,21 +495,30 @@
 }
 
 .guided-step-navigation button.done {
-  color: var(--green);
-  border-color: color-mix(in srgb, var(--green) 32%, var(--line));
-  background: color-mix(in srgb, var(--green) 5%, var(--white));
+  color: #5748c7;
+  border-color: color-mix(in srgb, #6558d9 38%, var(--line));
+  background: color-mix(in srgb, #6558d9 7%, var(--white));
 }
 
 .guided-step-navigation button.current {
   color: #fff;
-  border-color: var(--green);
-  background: var(--green);
-  box-shadow: 0 7px 16px rgba(31, 107, 82, .18);
+  border-color: #5748c7;
+  background: linear-gradient(135deg, #6558d9, #4778dc);
+  box-shadow: 0 7px 18px rgba(70, 67, 181, .28);
 }
 
 .guided-step-navigation button.current b {
-  color: var(--green-dark);
-  background: var(--lime);
+  color: #493cb7;
+  background: #eeebff;
+}
+
+.template-guided-setup .primary-button {
+  background: linear-gradient(135deg, #6558d9, #4778dc);
+  box-shadow: 0 9px 22px rgba(70, 67, 181, .24);
+}
+
+.template-guided-setup .primary-button:hover {
+  background: linear-gradient(135deg, #5548c7, #3768cc);
 }
 
 .guided-setup-footer,
@@ -571,6 +580,51 @@
 .fiscal-simulation-card {
   display: grid;
   gap: 17px;
+}
+
+.fiscal-collapse-title > div {
+  display: grid;
+  gap: 4px;
+}
+
+.fiscal-collapse-title h2,
+.fiscal-collapse-title p {
+  margin: 0;
+}
+
+.fiscal-collapse-title p {
+  max-width: 760px;
+  line-height: 1.5;
+}
+
+.fiscal-section-body {
+  display: grid;
+  gap: 17px;
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+}
+
+.fiscal-section-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.fiscal-section-tools > button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: #2f6fc5;
+  border: 1px solid #8ab8ed;
+  border-radius: 8px;
+  background: #edf6ff;
+  font-size: .72rem;
+  font-weight: 850;
 }
 
 .fiscal-section-heading {
@@ -758,6 +812,20 @@
   line-height: 1.45;
 }
 
+.fiscal-grid-preview-button {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px;
+  color: #5748c7;
+  border: 1px solid #978fe7;
+  border-radius: 9px;
+  background: color-mix(in srgb, #6558d9 7%, var(--white));
+  font-size: .76rem;
+  font-weight: 850;
+}
+
 .wizard-review {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -889,7 +957,36 @@
   box-shadow: inset 0 0 0 1px #d99a43;
 }
 
+[data-theme="dark"] .template-guided-setup {
+  border-color: #736ce3;
+  border-left-color: #8c83ff;
+  background: linear-gradient(135deg, #252442, #183444);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .32);
+}
+
+[data-theme="dark"] .guided-setup-topline {
+  color: #bcb7ff;
+}
+
+[data-theme="dark"] .guided-step-navigation button.done {
+  color: #bcb7ff;
+  border-color: #5b5793;
+  background: #292746;
+}
+
+[data-theme="dark"] .fiscal-grid-preview-button {
+  color: #d1ceff;
+  border-color: #625caf;
+  background: #292746;
+}
+
 [data-theme="dark"] .fiscal-section-heading > button {
+  color: #b9dcff;
+  border-color: #315f91;
+  background: #14283a;
+}
+
+[data-theme="dark"] .fiscal-section-tools > button {
   color: #b9dcff;
   border-color: #315f91;
   background: #14283a;
@@ -1004,6 +1101,11 @@
 
   .fiscal-section-heading > button {
     align-self: flex-start;
+  }
+
+  .fiscal-section-tools {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .exception-flow-help > svg {

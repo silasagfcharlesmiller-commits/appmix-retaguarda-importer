@@ -112,13 +112,6 @@ const guidedSetupSteps = [
     optional: false,
   },
   {
-    shortTitle: "Divergências",
-    title: "Comparar divergências",
-    description: "Escolha os campos que o robô deve comparar. As regras por UF serão revisadas somente no final.",
-    target: "comparar-divergencia",
-    optional: true,
-  },
-  {
     shortTitle: "XML",
     title: "Padrão XML",
     description: "Adicione pastas ou consultas SQL somente quando este template também configurar a captura de XML.",
@@ -137,6 +130,13 @@ const guidedSetupSteps = [
     title: "Dados de conexão",
     description: "Opcional e exclusivo por template. Cadastre banco, usuário e senha somente quando o robô precisar dessa conexão.",
     target: "template-connection",
+    optional: true,
+  },
+  {
+    shortTitle: "Divergências",
+    title: "Comparar divergências",
+    description: "Escolha os campos que o robô deve comparar. Na simulação final, a grade mostrará as marcações calculadas por UF.",
+    target: "comparar-divergencia",
     optional: true,
   },
   {
@@ -395,10 +395,10 @@ export default function TemplatesPage() {
     [xmlOpen, setXmlOpen] = useState(false),
     [schedulerOpen, setSchedulerOpen] = useState(false),
     [connectionOpen, setConnectionOpen] = useState(false),
+    [exceptionsOpen, setExceptionsOpen] = useState(false),
+    [simulationOpen, setSimulationOpen] = useState(false),
     [connection, setConnection] = useState<RetaguardaConnection>(blankConnection()),
-    [openMasters, setOpenMasters] = useState<string[]>(
-      divergenceMasters.map((master) => master.key),
-    );
+    [openMasters, setOpenMasters] = useState<string[]>([]);
   const [isMaster, setIsMaster] = useState(false),
     [auditOpen, setAuditOpen] = useState(false),
     [fiscalHelpOpen, setFiscalHelpOpen] = useState(false),
@@ -449,6 +449,15 @@ export default function TemplatesPage() {
     let active = true;
     setData(undefined);
     setPreviewUf("");
+    setExpandAll(false);
+    setOpen("");
+    setDivergenceOpen(false);
+    setOpenMasters([]);
+    setXmlOpen(false);
+    setSchedulerOpen(false);
+    setConnectionOpen(false);
+    setExceptionsOpen(false);
+    setSimulationOpen(false);
     setLoadingTemplate(true);
     fetch(`/api/mix/v1/templates/${selected}`, { signal: controller.signal })
       .then((r) => {
@@ -505,14 +514,15 @@ export default function TemplatesPage() {
   const dataReady = Boolean(data);
   useEffect(() => {
     if (guidedStep === null || !dataReady) return;
-    setExpandAll(guidedStep === 0);
-    if (guidedStep === 1) {
-      setDivergenceOpen(true);
-      setOpenMasters(divergenceMasters.map((master) => master.key));
-    }
-    if (guidedStep === 2) setXmlOpen(true);
-    if (guidedStep === 3) setSchedulerOpen(true);
-    if (guidedStep === 4) setConnectionOpen(true);
+    setExpandAll(false);
+    setOpen(guidedStep === 0 ? taxes[0][0] : "");
+    setDivergenceOpen(guidedStep === 4);
+    setOpenMasters([]);
+    setXmlOpen(guidedStep === 1);
+    setSchedulerOpen(guidedStep === 2);
+    setConnectionOpen(guidedStep === 3);
+    setExceptionsOpen(guidedStep === 5);
+    setSimulationOpen(guidedStep === 6);
     const timer = window.setTimeout(() => {
       document.getElementById(guidedSetupSteps[guidedStep].target)?.scrollIntoView({
         behavior: "smooth",
@@ -586,6 +596,16 @@ export default function TemplatesPage() {
         i === index ? ({ ...item, ...patch } as XmlPath) : item,
       ),
     });
+  }
+  function showFiscalPreviewInGrid() {
+    if (!previewUf) return;
+    if (guidedStep !== null) setGuidedStep(4);
+    setDivergenceOpen(true);
+    window.setTimeout(() => {
+      setDivergenceOpen(true);
+      setOpenMasters(["saida"]);
+      document.getElementById("divergencia-saida")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, guidedStep !== null ? 320 : 100);
   }
   async function copyName(value: string) {
     if (!value) return setMessage("Esta tabela ainda não possui nome.");
@@ -1295,6 +1315,65 @@ export default function TemplatesPage() {
               );
             })}
           </section>
+          <XmlEditor
+            data={data.configuracao_xml}
+            open={xmlOpen}
+            setOpen={setXmlOpen}
+            change={xmlChange}
+            changePath={xmlPath}
+          />
+          <SchedulerEditor data={data.configuracao_xml} open={schedulerOpen} setOpen={setSchedulerOpen} change={xmlChange} />
+          <section className="divergence-card retaguarda-card" id="template-connection">
+            <button className="divergence-title" type="button" onClick={() => setConnectionOpen(!connectionOpen)}>
+              <div>
+                <span className="eyebrow dark">DADOS DE CONEXAO</span>
+                <h2>Conexao do Integrador</h2>
+                <p>Dados exclusivos deste template; a senha permanece criptografada e não é copiada para outro template.</p>
+              </div>
+              {connectionOpen ? <ChevronUp /> : <ChevronDown />}
+            </button>
+            {connectionOpen && (
+              <div className="retaguarda-body">
+                <div className="retaguarda-grid">
+                  {([
+                    ["Host", "host", "text"], ["Porta", "porta", "number"],
+                  ] as const).map(([label, key, type]) => (
+                    <label key={key}>
+                      {label}
+                      <input type={type} value={String(connection[key] ?? "")}
+                        onChange={(e) => setConnection({ ...connection, [key]: e.target.value })} />
+                    </label>
+                  ))}
+                  <label>
+                    Dialeto
+                    <select value={connection.banco_tipo ?? ""} onChange={(e) => {
+                      const banco_tipo = e.target.value;
+                      const portas: Record<string,string> = { PostgreSQL:"5432", MySQL:"3306", MariaDB:"3306", SQLite:"0", "SQL Server":"1433", Oracle:"1521", Firebird:"3050" };
+                      setConnection({ ...connection, banco_tipo, porta: portas[banco_tipo] || connection.porta });
+                    }}>
+                      {['PostgreSQL','MySQL','MariaDB','SQLite','SQL Server','Oracle','Firebird'].map((dialeto) => <option key={dialeto}>{dialeto}</option>)}
+                    </select>
+                  </label>
+                  {([
+                    ["Banco de dados", "banco_nome", "text"],
+                    ["Usuario do banco", "usuario", "text"], ["Senha do banco", "senha", "password"],
+                    ["Servico", "servico", "text"], ["Servico Mixfiscal", "servico_mixfiscal", "text"],
+                    ["Tamanho max. mensagem (MB)", "tamanho_max_mensagem", "number"],
+                  ] as const).map(([label, key, type]) => (
+                    <label key={key}>
+                      {label}
+                      <input type={type} value={String(connection[key] ?? "")}
+                        placeholder={key === "senha" && connection.senha_cadastrada ? "Senha ja cadastrada; deixe vazio para manter" : ""}
+                        onChange={(e) => setConnection({ ...connection, [key]: e.target.value })} />
+                    </label>
+                  ))}
+                </div>
+                <div className="retaguarda-actions">
+                  <p>O CNPJ vem da automacao; todos os Machine IDs encontrados serao configurados e testados.</p>
+                </div>
+              </div>
+            )}
+          </section>
           <section className="divergence-card" id="comparar-divergencia">
             <button
               className="divergence-title"
@@ -1309,7 +1388,7 @@ export default function TemplatesPage() {
             </button>
             {divergenceOpen && (
               <>
-                {previewUf && <div className="preview-result-banner"><MapPinned size={18}/><span><strong>Resultado previsto para {previewUf}</strong><small>Os destaques mostram o valor final e sua origem: regra da UF ou exceção deste template.</small></span><a href="/painel/regras-fiscais">Editar estados</a></div>}
+                {previewUf && <div className="preview-result-banner"><MapPinned size={18}/><span><strong>Prévia da simulação para {previewUf}</strong><small>Os impostos variáveis aparecem marcados ou desmarcados conforme o resultado calculado. Esta visualização não salva a UF.</small></span><a href="/painel/regras-fiscais">Editar estados</a></div>}
                 <div className="divergence-toolbar">
                   <div className="field-type-legend"><span><i className="standard"/> Imposto padrão do template</span><span><i className="state"/> Imposto que varia por UF</span></div>
                   <button
@@ -1372,7 +1451,7 @@ export default function TemplatesPage() {
                                         const fiscalField = managedFiscalFields[full];
                                         const templateOverride = fiscalField ? data.configuracao.excecoes_regras_fiscais[fiscalField] : "herdar";
                                         const stateBehavior = fiscalField ? fiscalRules[previewUf]?.[fiscalField] : "herdar";
-                                        const behavior = data.configuracao.modo_regras_fiscais !== "desativado" && fiscalField
+                                        const behavior = previewUf && fiscalField
                                           ? (templateOverride === "aplicar" || templateOverride === "desativar" ? templateOverride : stateBehavior) : "herdar";
                                         const controlled = behavior === "aplicar" || behavior === "desativar";
                                         const overrideControlled = controlled && (templateOverride === "aplicar" || templateOverride === "desativar");
@@ -1417,101 +1496,47 @@ export default function TemplatesPage() {
               </>
             )}
           </section>
-          <XmlEditor
-            data={data.configuracao_xml}
-            open={xmlOpen}
-            setOpen={setXmlOpen}
-            change={xmlChange}
-            changePath={xmlPath}
-          />
-          <SchedulerEditor data={data.configuracao_xml} open={schedulerOpen} setOpen={setSchedulerOpen} change={xmlChange} />
-          <section className="divergence-card retaguarda-card" id="template-connection">
-            <button className="divergence-title" type="button" onClick={() => setConnectionOpen(!connectionOpen)}>
-              <div>
-                <span className="eyebrow dark">DADOS DE CONEXAO</span>
-                <h2>Conexao do Integrador</h2>
-                <p>Dados exclusivos deste template; a senha permanece criptografada e não é copiada para outro template.</p>
-              </div>
-              {connectionOpen ? <ChevronUp /> : <ChevronDown />}
-            </button>
-            {connectionOpen && (
-              <div className="retaguarda-body">
-                <div className="retaguarda-grid">
-                  {([
-                    ["Host", "host", "text"], ["Porta", "porta", "number"],
-                  ] as const).map(([label, key, type]) => (
-                    <label key={key}>
-                      {label}
-                      <input type={type} value={String(connection[key] ?? "")}
-                        onChange={(e) => setConnection({ ...connection, [key]: e.target.value })} />
-                    </label>
-                  ))}
-                  <label>
-                    Dialeto
-                    <select value={connection.banco_tipo ?? ""} onChange={(e) => {
-                      const banco_tipo = e.target.value;
-                      const portas: Record<string,string> = { PostgreSQL:"5432", MySQL:"3306", MariaDB:"3306", SQLite:"0", "SQL Server":"1433", Oracle:"1521", Firebird:"3050" };
-                      setConnection({ ...connection, banco_tipo, porta: portas[banco_tipo] || connection.porta });
-                    }}>
-                      {['PostgreSQL','MySQL','MariaDB','SQLite','SQL Server','Oracle','Firebird'].map((dialeto) => <option key={dialeto}>{dialeto}</option>)}
-                    </select>
-                  </label>
-                  {([
-                    ["Banco de dados", "banco_nome", "text"],
-                    ["Usuario do banco", "usuario", "text"], ["Senha do banco", "senha", "password"],
-                    ["Servico", "servico", "text"], ["Servico Mixfiscal", "servico_mixfiscal", "text"],
-                    ["Tamanho max. mensagem (MB)", "tamanho_max_mensagem", "number"],
-                  ] as const).map(([label, key, type]) => (
-                    <label key={key}>
-                      {label}
-                      <input type={type} value={String(connection[key] ?? "")}
-                        placeholder={key === "senha" && connection.senha_cadastrada ? "Senha ja cadastrada; deixe vazio para manter" : ""}
-                        onChange={(e) => setConnection({ ...connection, [key]: e.target.value })} />
-                    </label>
-                  ))}
-                </div>
-                <div className="retaguarda-actions">
-                  <p>O CNPJ vem da automacao; todos os Machine IDs encontrados serao configurados e testados.</p>
-                </div>
-              </div>
-            )}
-          </section>
           <section className="divergence-card fiscal-exceptions-card" id="template-fiscal-overrides">
-            <div className="fiscal-section-heading">
+            <button className="divergence-title fiscal-collapse-title" type="button" onClick={() => setExceptionsOpen(!exceptionsOpen)}>
               <div>
                 <span className="eyebrow dark">ETAPA OPCIONAL</span>
                 <h2>Exceções deste template</h2>
                 <p>Altere somente quando este template precisar contrariar a regra da UF. Se estiver em dúvida, mantenha todos como “Seguir regra da UF”.</p>
               </div>
-              <button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={16}/> Ver explicação</button>
-            </div>
-            <div className="exception-flow-help">
-              <span><b>Regra da UF</b><small>É o comportamento padrão.</small></span>
-              <ArrowRight size={18}/>
-              <span><b>Exceção do template</b><small>Tem prioridade apenas se você escolher marcado ou desmarcado.</small></span>
-            </div>
-            <div className="template-fiscal-override-grid">
-              {Object.entries(fiscalFieldLabels).map(([field, label]) => (
-                <label key={field} className={(data.configuracao.excecoes_regras_fiscais[field] || "herdar") !== "herdar" ? "has-exception" : ""}>
-                  <span>{label}</span>
-                  <select value={data.configuracao.excecoes_regras_fiscais[field] || "herdar"} onChange={(event) => setData((current) => current ? ({...current, configuracao:{...current.configuracao, excecoes_regras_fiscais:{...current.configuracao.excecoes_regras_fiscais, [field]:event.target.value as FiscalBehavior}}}) : current)}>
-                    <option value="herdar">Seguir regra da UF (recomendado)</option>
-                    <option value="aplicar">Sempre marcado neste template</option>
-                    <option value="desativar">Sempre desmarcado neste template</option>
-                  </select>
-                </label>
-              ))}
-            </div>
-            <p className="exception-example"><strong>Exemplo:</strong> se FECP estiver como “Sempre desmarcado”, essa escolha vence a regra estadual somente neste template. Os outros quatro campos continuam seguindo a UF.</p>
+              {exceptionsOpen ? <ChevronUp/> : <ChevronDown/>}
+            </button>
+            {exceptionsOpen && <div className="fiscal-section-body">
+              <div className="fiscal-section-tools"><span>O padrão seguro é não criar exceções.</span><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={16}/> Ver explicação</button></div>
+              <div className="exception-flow-help">
+                <span><b>Regra da UF</b><small>É o comportamento padrão.</small></span>
+                <ArrowRight size={18}/>
+                <span><b>Exceção do template</b><small>Tem prioridade apenas se você escolher marcado ou desmarcado.</small></span>
+              </div>
+              <div className="template-fiscal-override-grid">
+                {Object.entries(fiscalFieldLabels).map(([field, label]) => (
+                  <label key={field} className={(data.configuracao.excecoes_regras_fiscais[field] || "herdar") !== "herdar" ? "has-exception" : ""}>
+                    <span>{label}</span>
+                    <select value={data.configuracao.excecoes_regras_fiscais[field] || "herdar"} onChange={(event) => setData((current) => current ? ({...current, configuracao:{...current.configuracao, excecoes_regras_fiscais:{...current.configuracao.excecoes_regras_fiscais, [field]:event.target.value as FiscalBehavior}}}) : current)}>
+                      <option value="herdar">Seguir regra da UF (recomendado)</option>
+                      <option value="aplicar">Sempre marcado neste template</option>
+                      <option value="desativar">Sempre desmarcado neste template</option>
+                    </select>
+                  </label>
+                ))}
+              </div>
+              <p className="exception-example"><strong>Exemplo:</strong> se FECP estiver como “Sempre desmarcado”, essa escolha vence a regra estadual somente neste template. Os outros quatro campos continuam seguindo a UF.</p>
+            </div>}
           </section>
           <section className="divergence-card fiscal-simulation-card" id="template-fiscal-simulation">
-            <div className="fiscal-section-heading">
+            <button className="divergence-title fiscal-collapse-title" type="button" onClick={() => setSimulationOpen(!simulationOpen)}>
               <div>
                 <span className="eyebrow orange">ÚLTIMA ETAPA</span>
                 <h2>Simule antes de salvar</h2>
                 <p>Escolha uma UF para conferir as cinco flags controladas. Esta prévia não grava a UF no template.</p>
               </div>
-            </div>
+              {simulationOpen ? <ChevronUp/> : <ChevronDown/>}
+            </button>
+            {simulationOpen && <div className="fiscal-section-body">
             <label className="uf-preview-control"><span>1. ESCOLHA A UF DA SIMULAÇÃO</span>
               <select value={previewUf} onChange={(event) => setPreviewUf(event.target.value)}>
                 <option value="">Selecione uma UF para ver o resultado</option>
@@ -1520,17 +1545,20 @@ export default function TemplatesPage() {
               <small>No job real, o worker consulta automaticamente a UF do CNPJ. <a href="/painel/regras-fiscais">Editar regras estaduais →</a></small>
             </label>
             {previewUf ? (
-              <div className="fiscal-preview-table">
-                <div className="fiscal-preview-header"><span>Flag fiscal</span><span>Template</span><span>Resultado em {previewUf}</span><span>Origem</span></div>
-                {fiscalPreview.map((item) => (
-                  <div key={item.field} className={item.current !== item.result ? "will-change" : ""}>
-                    <strong>{item.label}</strong>
-                    <span>{item.current ? "Marcado" : "Desmarcado"}</span>
-                    <span><b>{item.result ? "Marcado" : "Desmarcado"}</b>{item.current !== item.result && <em>Vai mudar</em>}</span>
-                    <small>{item.origin}</small>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="fiscal-preview-table">
+                  <div className="fiscal-preview-header"><span>Flag fiscal</span><span>Template</span><span>Resultado em {previewUf}</span><span>Origem</span></div>
+                  {fiscalPreview.map((item) => (
+                    <div key={item.field} className={item.current !== item.result ? "will-change" : ""}>
+                      <strong>{item.label}</strong>
+                      <span>{item.current ? "Marcado" : "Desmarcado"}</span>
+                      <span><b>{item.result ? "Marcado" : "Desmarcado"}</b>{item.current !== item.result && <em>Vai mudar</em>}</span>
+                      <small>{item.origin}</small>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className="fiscal-grid-preview-button" onClick={showFiscalPreviewInGrid}><MapPinned size={17}/> Ver impostos marcados na grade Comparar divergências</button>
+              </>
             ) : <div className="fiscal-preview-empty"><MapPinned size={22}/><span><strong>Aguardando uma UF</strong><small>Selecione o estado acima para comparar o template atual com o resultado calculado.</small></span></div>}
             <div className="fiscal-mode-heading"><strong>2. ESCOLHA O MODO QUE SERÁ SALVO</strong><button type="button" onClick={() => setFiscalHelpOpen(true)}><CircleHelp size={15}/> Como funciona?</button></div>
             <div className="guided-fiscal-modes">
@@ -1546,6 +1574,7 @@ export default function TemplatesPage() {
             </div>
             {data.configuracao.modo_regras_fiscais === "simulacao" && <div className="fiscal-simulation-banner"><ShieldCheck size={19}/><span><strong>SIMULAÇÃO ATIVA</strong><small>O próximo job registrará as diferenças no log, mas manterá essas cinco flags como estão. VIEW, TMP, XML e as demais configurações continuam sendo aplicados normalmente.</small></span></div>}
             {data.configuracao.modo_regras_fiscais === "automatico" && <div className="fiscal-auto-banner"><Check size={19}/><span><strong>APLICAÇÃO AUTOMÁTICA ATIVA</strong><small>No próximo job, as cinco flags serão ajustadas conforme a UF real do CNPJ e as exceções escolhidas acima.</small></span></div>}
+            </div>}
           </section>
           <button className="primary-button save-bottom" id="template-final-save" onClick={save}>
             <Check size={18} /> Salvar todas as alterações
