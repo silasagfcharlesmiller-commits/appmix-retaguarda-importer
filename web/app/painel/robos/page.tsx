@@ -44,7 +44,7 @@ export default function RobotsPage() {
   useEffect(() => {
     void load();
     const refresh = () => { if (document.visibilityState === "visible") void load(true); };
-    const timer = window.setInterval(refresh, 5000);
+    const timer = window.setInterval(refresh, 2000);
     window.addEventListener("focus", refresh);
     return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [load]);
@@ -77,7 +77,7 @@ export default function RobotsPage() {
 
   return <main className="editor-page agents-page">
     <header className="editor-header agents-header">
-      <div><a className="back" href="/painel"><ArrowLeft size={17}/> Voltar ao painel</a><span className="eyebrow dark">CONTROLE REMOTO DO INTEGRADOR</span><h1>Robôs dos clientes</h1><p>Inicie, pause, reinicie ou atualize o agente. Consulta automática a cada 5 segundos; processo aberto não comprova conexão com a retaguarda.</p></div>
+      <div><a className="back" href="/painel"><ArrowLeft size={17}/> Voltar ao painel</a><span className="eyebrow dark">CONTROLE REMOTO DO INTEGRADOR</span><h1>Robôs dos clientes</h1><p>Inicie, pause, reinicie ou atualize o agente. Consulta automática a cada 2 segundos; processo aberto não comprova conexão com a retaguarda.</p></div>
       <button className="secondary-button" onClick={() => void load()} disabled={loading}><RefreshCw size={16}/> Atualizar</button>
     </header>
     {refreshError && <div className="notice">{refreshError} Última leitura preservada; nova tentativa automática em alguns segundos.</div>}
@@ -95,7 +95,7 @@ export default function RobotsPage() {
         const pending = ["pending", "delivered"].includes(agent.last_command_status || "");
         const contact = refreshError ? "CONSULTA INDISPONÍVEL" : agent.connection_status === "delayed" ? "CONTATO ATRASADO" : agent.connection_status === "pending" ? "AGUARDANDO PRIMEIRO CONTATO" : agent.connection_status === "offline" ? "SEM CONTATO RECENTE" : agent.integrator_observed === false ? "PROCESSO SEM CONFIRMAÇÃO" : "";
         return <article className="profile-card agent-card" key={agent.id}>
-          <div className="agent-card-head"><div className={`agent-icon ${agent.agent_online ? "online" : "offline"}`}>{agent.agent_online ? <Bot/> : <WifiOff/>}</div><div><small>{formatCnpj(agent.cnpj)}</small><h2>{agent.client_name || `Cliente ${formatCnpj(agent.cnpj)}`}</h2><span>{agent.retaguarda || "Retaguarda não informada"}</span><button className="secondary-button" disabled={busy !== ""} onClick={() => setEditing({...agent})}>Identificar cliente</button></div><b className={`agent-badge ${operational ? "online" : agent.desired_state === "paused" ? "paused" : "offline"}`}>{contact || (operational ? "PROCESSO ABERTO" : agent.desired_state === "paused" ? "PAUSADO" : agent.agent_online ? "INTEGRADOR PARADO" : "SEM CONTATO RECENTE")}</b></div>
+          <div className="agent-card-head"><div className={`agent-icon ${agent.agent_online ? "online" : "offline"}`}>{agent.agent_online ? <Bot/> : <WifiOff/>}</div><div><small>{formatCnpj(agent.cnpj)}</small><h2>{agent.client_name || "Nome do cliente não informado"}</h2><span>{agent.retaguarda || "Retaguarda não informada"}</span><button className="secondary-button" disabled={busy !== ""} onClick={() => setEditing({...agent})}>Identificar cliente</button></div><b className={`agent-badge ${operational ? "online" : agent.desired_state === "paused" ? "paused" : "offline"}`}>{contact || (operational ? "PROCESSO ABERTO" : agent.desired_state === "paused" ? "PAUSADO" : agent.agent_online ? "INTEGRADOR PARADO" : "SEM CONTATO RECENTE")}</b></div>
           <div className="agent-details"><span><small>Máquina / conta</small><strong>{agent.computer_name} · {agent.windows_user.split("\\").pop()}</strong></span><span><small>Machine ID</small><code title={agent.machine_id}>{agent.machine_id.slice(0, 16)}…</code></span><span><small>Agente</small><strong>v{agent.agent_version}</strong></span><span><small>Sessão do Windows</small><strong>{!agent.agent_online || refreshError ? "Sem confirmação recente" : agent.session_ready ? "Disponível" : "Aguardando login"}</strong></span><span><small>Último contato</small><strong>{seen(agent.last_seen)}</strong></span></div>
           {pending && <div className="agent-last-result"><Clock3 size={15}/><span>{agent.last_action === "update" ? "Atualização em andamento" : "Comando em andamento"} · {agent.last_command_status === "pending" ? "aguardando recebimento pelo agente" : "recebido; aguardando confirmação na máquina"}</span></div>}
           {agent.last_result && <div className="agent-last-result"><Clock3 size={15}/><span>{agent.last_result}</span></div>}

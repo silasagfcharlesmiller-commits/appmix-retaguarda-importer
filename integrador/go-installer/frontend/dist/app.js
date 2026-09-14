@@ -12,7 +12,7 @@ function setMode(mode, message) {
 }
 function setBusy(busy) {
   operationRunning = busy;
-  for (const id of ['cnpj','username','password','clientName','retaguarda','togglePassword','checkButton','prepareButton','defenderExclusion']) $('#'+id).disabled = busy;
+  for (const id of ['cnpj','username','password','togglePassword','checkButton','prepareButton','defenderExclusion']) $('#'+id).disabled = busy;
   $('#installButton').disabled = busy || !environmentReady;
   $('#agentOnlyButton').disabled = busy;
 }
@@ -63,10 +63,10 @@ async function install(event, agentOnly = false) {
     catch (error) { showModal('Seleção do Integrador',String(error?.message || error),true); return; }
   }
   if (!environmentReady) return;
-  setBusy(true); setMode('busy',agentOnly ? 'Instalando somente o Agente...' : 'Iniciando instalação...');
+  setBusy(true); setMode('busy',agentOnly ? 'Instalando Agente e Painel...' : 'Instalando todos os componentes...');
   const poll = setInterval(async () => { try { const state = await backend().State(); if (state?.message) $('#statusMessage').textContent = state.message; } catch (_) {} },700);
   try {
-    const result = await backend().Install({cnpj:$('#cnpj').value,username:$('#username').value.trim(),password:$('#password').value,agent_only:agentOnly,client_name:$('#clientName').value.trim(),retaguarda:$('#retaguarda').value.trim()});
+    const result = await backend().Install({cnpj:$('#cnpj').value,username:$('#username').value.trim(),password:$('#password').value,agent_only:agentOnly});
     latestReport = {...latestReport,checks:result.checks,diagnostic:result.diagnostic,warning:result.warning}; renderChecks(result.checks);
     const complete = result.agent_verified && !result.warning;
     setMode(complete ? 'ready' : 'error',complete ? 'Instalação concluída; início e reinício confirmados pela API.' : 'Instalado com pendência. Confira as orientações no relatório.');

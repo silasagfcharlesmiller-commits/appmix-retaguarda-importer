@@ -46,7 +46,7 @@ func (handler *serviceHandler) Execute(_ []string, requests <-chan svc.ChangeReq
 }
 
 func (handler *serviceHandler) loop(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
 		handler.cycle(ctx)

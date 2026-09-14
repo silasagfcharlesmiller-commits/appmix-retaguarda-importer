@@ -38,8 +38,6 @@ type InstallResult struct {
 type Installer struct {
 	SetupPath  string
 	AgentOnly  bool
-	ClientName string
-	Retaguarda string
 	TargetDir  string
 	TargetEXE  string
 	RuntimeDir string
@@ -544,7 +542,7 @@ func (installer *Installer) Install(cnpj, username, password string, progress fu
 }
 
 func (installer *Installer) InstallWithOptions(input InstallInput, progress func(string)) (InstallResult, error) {
-	installer.ClientName, installer.Retaguarda, installer.AgentOnly = input.ClientName, input.Retaguarda, input.AgentOnly
+	installer.AgentOnly = input.AgentOnly
 	diagnostics := NewDiagnostics(installer.TargetDir)
 	_, checks := environmentChecks(installer.TargetDir, diagnostics, true)
 	var result InstallResult
@@ -614,10 +612,37 @@ func (installer *Installer) installAgentOnly(input InstallInput, diagnostics *Di
 	if err != nil {
 		return InstallResult{}, err
 	}
+	if err := installer.CopyPanelFiles(); err != nil {
+		return InstallResult{}, err
+	}
 	if err := installer.InstallAgent(context.Background(), api.BearerToken(), input.Username, cnpj, machineID, identity.InteractiveUser, progress); err != nil {
 		return InstallResult{}, err
 	}
 	return InstallResult{CNPJ: cnpj, MachineID: machineID, Monitor: agent.ServiceName, AgentInstalled: true}, nil
+}
+
+// CopyPanelFiles installs only the local control-panel files beside an existing Integrator.
+// It deliberately excludes desktop-integrador.exe so Agent + Panel never changes it.
+func (installer *Installer) CopyPanelFiles() error {
+	sourceDir := filepath.Join(installer.RuntimeDir, "payload")
+	for _, name := range []string{"Painel_Mix.bat", "atualizador_mix.ps1", "monitor_mix.ps1", "integrador_version.json"} {
+		source := filepath.Join(sourceDir, name)
+		if _, err := os.Stat(source); err != nil {
+			return fail("Arquivo do Painel ausente no instalador: %s", name)
+		}
+		if err := copyPanelFile(source, filepath.Join(installer.TargetDir, name)); err != nil {
+			return fail("Não foi possível instalar o arquivo do Painel %s: %v", name, err)
+		}
+	}
+	return nil
+}
+
+func copyPanelFile(source, destination string) error {
+	data, err := os.ReadFile(source)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(destination, data, 0o644)
 }
 
 // Only the full installation copies the official Integrator payload. Opening the
@@ -757,7 +782,7 @@ func (installer *Installer) InstallAgent(ctx context.Context, mixBearer, mixLogi
 	}
 	_, err := agent.Provision(ctx, agent.ProvisionInput{
 		AgentExecutable:  filepath.Join(installer.TargetDir, "MixFiscalAgentService.exe"),
-		ManageIntegrator: !installer.AgentOnly, InstallerSetup: installer.SetupPath, InstallerRuntime: installer.RuntimeDir, ClientName: installer.ClientName, Retaguarda: installer.Retaguarda,
+		ManageIntegrator: !installer.AgentOnly, InstallerSetup: installer.SetupPath, InstallerRuntime: installer.RuntimeDir,
 		SourceExecutable: source, APIBase: agent.DefaultAPI, MixBearer: mixBearer,
 		MixLogin: mixLogin, CNPJ: cnpj, MachineID: machineID,
 		IntegratorPath: installer.TargetEXE, WindowsUser: windowsUser, AgentVersion: installer.Version,

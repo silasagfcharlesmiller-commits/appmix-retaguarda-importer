@@ -11,12 +11,10 @@ import (
 )
 
 type InstallInput struct {
-	CNPJ       string `json:"cnpj"`
-	Username   string `json:"username"`
-	Password   string `json:"password"`
-	AgentOnly  bool   `json:"agent_only"`
-	ClientName string `json:"client_name"`
-	Retaguarda string `json:"retaguarda"`
+	CNPJ      string `json:"cnpj"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	AgentOnly bool   `json:"agent_only"`
 }
 
 type UIState struct {

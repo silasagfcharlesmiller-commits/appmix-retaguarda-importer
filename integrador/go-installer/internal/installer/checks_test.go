@@ -56,3 +56,39 @@ func TestAgentOnlyDoesNotCreateMissingIntegrator(t *testing.T) {
 		t.Fatal("agent-only installed the integrator")
 	}
 }
+
+func TestAgentOnlyCopiesPanelWithoutReplacingIntegrator(t *testing.T) {
+	root := t.TempDir()
+	runtime := filepath.Join(root, "runtime")
+	payload := filepath.Join(runtime, "payload")
+	target := filepath.Join(root, "cliente")
+	if err := os.MkdirAll(payload, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(target, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"Painel_Mix.bat", "atualizador_mix.ps1", "monitor_mix.ps1", "integrador_version.json"} {
+		if err := os.WriteFile(filepath.Join(payload, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	integrator := filepath.Join(target, "desktop-integrador.exe")
+	if err := os.WriteFile(integrator, []byte("cliente-existente"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	installer := &Installer{RuntimeDir: runtime, TargetDir: target, TargetEXE: integrator}
+	if err := installer.CopyPanelFiles(); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"Painel_Mix.bat", "atualizador_mix.ps1", "monitor_mix.ps1", "integrador_version.json"} {
+		content, err := os.ReadFile(filepath.Join(target, name))
+		if err != nil || string(content) != name {
+			t.Fatalf("panel file was not copied: %s (%v)", name, err)
+		}
+	}
+	content, err := os.ReadFile(integrator)
+	if err != nil || string(content) != "cliente-existente" {
+		t.Fatal("agent + panel replaced the existing Integrator")
+	}
+}
