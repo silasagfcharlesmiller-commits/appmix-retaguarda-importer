@@ -41,12 +41,13 @@ def main() -> int:
     required_runtime = {
         "Instalador-Mix-Fiscal-App.exe",
         "MixFiscal-Bootstrap.exe",
+        "MixFiscalAgentService.exe",
         "payload_manifest.json",
     }
     runtime_files = {path.name for path in runtime.iterdir() if path.is_file()}
     if runtime_files != required_runtime:
         raise RuntimeError(f"Runtime Go/Wails inesperado: {sorted(runtime_files)}")
-    for name in ("Instalador-Mix-Fiscal-App.exe", "MixFiscal-Bootstrap.exe"):
+    for name in ("Instalador-Mix-Fiscal-App.exe", "MixFiscal-Bootstrap.exe", "MixFiscalAgentService.exe"):
         executable = runtime / name
         if executable.stat().st_size < 500_000 or not mz(executable):
             raise RuntimeError(f"Executável nativo ausente ou inválido: {name}.")
@@ -80,7 +81,7 @@ def main() -> int:
         raise RuntimeError(f"Runtime legado ainda incluído no pacote: {forbidden[0]}")
 
     print(
-        "Pacote Go/Wails íntegro: 2 executáveis nativos, sem Python/PyQt/Playwright/Node; "
+        "Pacote Go/Wails íntegro: 3 executáveis nativos, sem Python/PyQt/Playwright/Node; "
         f"setup {setup.stat().st_size} bytes; SHA-256 {sha256(setup)}."
     )
     return 0

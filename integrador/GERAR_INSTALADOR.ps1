@@ -1,4 +1,8 @@
-param([switch]$SkipDependencies)
+param(
+    [switch]$SkipDependencies,
+    [string]$OutputDirectory = '',
+    [string]$OutputBaseName = 'Instalador-Mix-Fiscal'
+)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -25,7 +29,14 @@ $buildRoot = Join-Path $root 'build'
 $runtimeDist = Join-Path $buildRoot 'installer-runtime'
 $runtimeDir = Join-Path $runtimeDist 'Instalador-Mix-Fiscal-App'
 $payloadManifest = Join-Path $buildRoot 'payload_manifest.json'
-$installer = Join-Path $root 'entrega\Instalador-Mix-Fiscal.exe'
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
+    $OutputDirectory = Join-Path $root 'entrega'
+}
+$OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
+if ($OutputBaseName -notmatch '^[A-Za-z0-9._-]+$') {
+    throw 'Nome do arquivo de saida invalido.'
+}
+$installer = Join-Path $OutputDirectory ($OutputBaseName + '.exe')
 $goProject = Join-Path $root 'go-installer'
 
 $resolvedRoot = [System.IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
@@ -84,6 +95,10 @@ try {
         -o (Join-Path $runtimeDir 'MixFiscal-Bootstrap.exe') .\cmd\bootstrap
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar o bootstrap do WebView2.' }
 
+    & $go build -buildvcs=false -trimpath -ldflags '-s -w -H windowsgui' `
+        -o (Join-Path $runtimeDir 'MixFiscalAgentService.exe') .\cmd\agent
+    if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar o servico nativo Mix Agent.' }
+
     $uiLdFlags = "-s -w -H windowsgui -X main.version=$version"
     & $go build -buildvcs=false -tags 'desktop,production,wv2runtime.download' -trimpath `
         -ldflags $uiLdFlags -o (Join-Path $runtimeDir 'Instalador-Mix-Fiscal-App.exe') .\cmd\ui
@@ -109,11 +124,12 @@ $env:MIX_SETUP_VERSION = $version
 $env:MIX_SETUP_RUNTIME = $runtimeDir
 $env:MIX_SETUP_SOURCE = $root
 $env:MIX_SETUP_OUTPUT = Split-Path -Parent $installer
+$env:MIX_SETUP_BASENAME = $OutputBaseName
 try {
     & $iscc (Join-Path $root 'Instalador-Mix-Fiscal.iss')
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao compilar o pacote Inno Setup.' }
 } finally {
-    Remove-Item Env:MIX_SETUP_VERSION,Env:MIX_SETUP_RUNTIME,Env:MIX_SETUP_SOURCE,Env:MIX_SETUP_OUTPUT -ErrorAction SilentlyContinue
+    Remove-Item Env:MIX_SETUP_VERSION,Env:MIX_SETUP_RUNTIME,Env:MIX_SETUP_SOURCE,Env:MIX_SETUP_OUTPUT,Env:MIX_SETUP_BASENAME -ErrorAction SilentlyContinue
 }
 
 & $python (Join-Path $root 'verificar_pacote.py') $installer $runtimeDir $payloadManifest
@@ -121,4 +137,4 @@ if ($LASTEXITCODE -ne 0) {
     Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
     throw 'O pacote final nao passou na verificacao de integridade.'
 }
-Write-Host "Instalador Go/Wails criado e validado em: $installer"
+Write-Host "Instalador Go/Wails com Mix Agent criado e validado em: $installer"

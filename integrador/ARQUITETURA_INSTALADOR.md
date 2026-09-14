@@ -1,5 +1,8 @@
 # Arquitetura do Instalador do Integrador Mix Fiscal
 
+> A versão estável descrita abaixo permanece na `main`. O protótipo 1.3.0 do serviço remoto está
+> documentado separadamente em [`AGENTE_REMOTO.md`](AGENTE_REMOTO.md) e ainda não foi publicado.
+
 Referência técnica atualizada em **2026-09-14** para a branch
 `main`, versão `1.2.8`. Antes de gerar ou publicar, leia também
 [`PUBLICACAO.md`](PUBLICACAO.md) e confirme o branch e o `git status`.

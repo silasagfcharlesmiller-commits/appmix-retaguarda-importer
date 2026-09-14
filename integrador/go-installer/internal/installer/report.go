@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"appmix/integrador-installer/internal/agent"
 )
 
 type EnvironmentReport struct {
@@ -86,7 +88,7 @@ func (installer *Installer) EnvironmentReport(diagnostics *Diagnostics) (Environ
 		IntegratorFileVersion: fileVersion(installer.TargetEXE),
 		PanelVersion:          map[bool]string{true: release, false: "não instalado"}[fileExists(filepath.Join(installer.TargetDir, "Painel_Mix.bat"))],
 		WebView2Version:       webView,
-		Monitor:               map[bool]string{true: "instalado", false: "não instalado"}[taskInstalled(monitorTask)],
+		Monitor:               map[bool]string{true: "Mix Agent instalado", false: "não instalado"}[agent.Installed()],
 		RunAsAdmin:            map[bool]string{true: "configurado", false: "não configurado"}[IsRunAsAdminConfigured(installer.TargetEXE)],
 		ProtectionFindings:    securityProtectionFindings(installer.TargetDir),
 		TargetDir:             installer.TargetDir,

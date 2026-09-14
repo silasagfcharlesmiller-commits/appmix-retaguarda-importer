@@ -2,6 +2,7 @@
 #define RuntimeDir GetEnv("MIX_SETUP_RUNTIME")
 #define SourceDir GetEnv("MIX_SETUP_SOURCE")
 #define OutputDir GetEnv("MIX_SETUP_OUTPUT")
+#define OutputBaseName GetEnv("MIX_SETUP_BASENAME")
 
 [Setup]
 AppId={{CA9561A5-0DA0-48D7-A295-F928082366D2}
@@ -24,7 +25,7 @@ WizardStyle=modern
 Compression=lzma2/ultra64
 SolidCompression=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=Instalador-Mix-Fiscal
+OutputBaseFilename={#OutputBaseName}
 CloseApplications=no
 AllowUNCPath=no
 

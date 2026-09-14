@@ -249,6 +249,8 @@ func (api *MixAPI) Login(username, password string) error {
 	return nil
 }
 
+func (api *MixAPI) BearerToken() string { return api.token }
+
 func (api *MixAPI) Settings(machineID string) (map[string]any, error) {
 	if _, err := ValidateMachineID(machineID); err != nil {
 		return nil, err

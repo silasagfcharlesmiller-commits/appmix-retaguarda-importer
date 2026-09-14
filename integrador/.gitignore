@@ -6,5 +6,6 @@ dist/
 !go-installer/frontend/dist/
 !go-installer/frontend/dist/**
 entrega/
+entrega-agente/
 *.spec
 backup_instalador/

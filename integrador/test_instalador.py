@@ -33,12 +33,15 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("go build", generator)
         self.assertIn("MixFiscal-Bootstrap.exe", generator)
         self.assertIn("Instalador-Mix-Fiscal-App.exe", generator)
+        self.assertIn("MixFiscalAgentService.exe", generator)
+        self.assertIn("MixFiscalAgentService.exe", verifier)
         self.assertIn("Inno Setup", generator)
         self.assertNotIn("PyInstaller", generator)
         self.assertNotIn("--onefile", generator)
         self.assertNotIn("--collect-all playwright", generator)
         self.assertIn("sem Python/PyQt/Playwright/Node", verifier)
         self.assertIn("automateUI", automation)
+        self.assertIn("InstallAgent", automation)
         self.assertNotIn("sync_playwright", automation)
 
     def test_setup_bootstraps_webview_before_opening_wails(self):
@@ -48,6 +51,21 @@ class InstallerTests(unittest.TestCase):
         self.assertLess(bootstrap, interface)
         self.assertIn("ewWaitUntilTerminated", setup)
         self.assertIn("MinVersion=10.0.14393", setup)
+
+    def test_remote_agent_is_native_hidden_and_does_not_use_script_hosts(self):
+        root = Path(__file__).parent
+        generator = (root / "GERAR_INSTALADOR.ps1").read_text(encoding="utf-8-sig")
+        sources = "\n".join(
+            path.read_text(encoding="utf-8-sig")
+            for path in (root / "go-installer/internal/agent").glob("*.go")
+        ).lower()
+        self.assertIn("mixfiscalagentservice.exe", generator.lower())
+        self.assertIn("-h windowsgui", generator.lower())
+        self.assertNotIn("powershell.exe", sources)
+        self.assertNotIn("cmd.exe", sources)
+        self.assertNotIn("wscript.exe", sources)
+        self.assertIn('hiddencommand("schtasks.exe"', sources)
+        self.assertIn('hiddencommand("taskkill.exe"', sources)
 
     def test_gui_blocks_install_until_environment_is_ready(self):
         gui = (Path(__file__).parent / "instalador_gui.py").read_text(encoding="utf-8-sig")
@@ -79,6 +97,11 @@ class InstallerTests(unittest.TestCase):
         self.assertIn(b'TAREFA_BOOT', panel)
         self.assertIn(b'TAREFA_STARTUP', panel)
         self.assertIn(b'TAREFA_WATCHDOG', panel)
+        self.assertIn(b'MixFiscalAgent', panel)
+        self.assertIn(b'Mix Fiscal - Abrir Integrador', panel)
+        self.assertIn(b'sc delete "%NOME_SERVICO_AGENTE%"', panel)
+        self.assertNotIn(b'taskkill /f /im msedgewebview2.exe', panel)
+        self.assertIn(b'taskkill /f /t /im "%NOME_EXE%"', panel)
         self.assertNotIn(b'/ru "%USERNAME%"', panel)
 
     def test_updater_covers_all_installed_components(self):

@@ -96,6 +96,6 @@ func (app *App) Install(input InstallInput) (InstallResult, error) {
 		app.setState(false, "erro", err.Error())
 		return InstallResult{}, err
 	}
-	app.setState(false, "concluído", "Instalação concluída e monitoramento ativo")
+	app.setState(false, "concluído", "Instalação concluída e controle pelo painel ativo")
 	return result, nil
 }

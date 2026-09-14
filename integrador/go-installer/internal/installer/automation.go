@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"appmix/integrador-installer/internal/agent"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
@@ -548,7 +550,8 @@ func (installer *Installer) runInstall(cnpj, username, password string, diagnost
 	}
 	diagnostics.Event("administrador", "ok", "Instalador executando elevado", nil)
 	progress("Validando conta do Windows, perfil e permissões")
-	if _, err := PreflightEnvironment(installer.TargetDir, diagnostics); err != nil {
+	identity, err := PreflightEnvironment(installer.TargetDir, diagnostics)
+	if err != nil {
 		return InstallResult{}, machineID, err
 	}
 	normalizedCNPJ, err := NormalizeCNPJ(cnpj)
@@ -597,10 +600,6 @@ func (installer *Installer) runInstall(cnpj, username, password string, diagnost
 	if automationErr != nil {
 		return InstallResult{}, machineID, automationErr
 	}
-	if err := installer.InstallMonitor(progress); err != nil {
-		return InstallResult{}, machineID, err
-	}
-	diagnostics.Event("monitor", "ok", "Tarefa de monitoramento instalada e verificada", nil)
 	progress("Confirmando cadastro na API")
 	if err := api.VerifyRegistration(normalizedCNPJ, machineID); err != nil {
 		return InstallResult{}, machineID, err
@@ -614,9 +613,34 @@ func (installer *Installer) runInstall(cnpj, username, password string, diagnost
 	if err := api.WaitUntilOnline(normalizedCNPJ, machineID, 40*time.Second); err != nil {
 		return InstallResult{}, machineID, err
 	}
+	if err := installer.InstallAgent(context.Background(), api.BearerToken(), username, normalizedCNPJ, machineID, identity.InteractiveUser, progress); err != nil {
+		return InstallResult{}, machineID, err
+	}
+	diagnostics.Event("monitor", "ok", "Servico Mix Agent instalado, vinculado e iniciado", map[string]any{"service": agent.ServiceName})
 	diagnostics.Event("cadastro", "ok", "CNPJ, serviço Mix Fiscal e Machine ID confirmados", nil)
 	diagnostics.Event("processo", "ok", "Instalação concluída sem forçar uma segunda abertura do Integrador", nil)
-	return InstallResult{CNPJ: normalizedCNPJ, MachineID: machineID, Monitor: monitorTask}, machineID, nil
+	return InstallResult{CNPJ: normalizedCNPJ, MachineID: machineID, Monitor: agent.ServiceName}, machineID, nil
+}
+
+func (installer *Installer) InstallAgent(ctx context.Context, mixBearer, mixLogin, cnpj, machineID, windowsUser string, progress func(string)) error {
+	progress("Vinculando a maquina ao controle de robos do App Mix")
+	source := filepath.Join(installer.RuntimeDir, "MixFiscalAgentService.exe")
+	if !hasMZHeader(source) {
+		return fail("O executavel nativo do Mix Agent nao foi encontrado ou esta invalido.")
+	}
+	_, err := agent.Provision(ctx, agent.ProvisionInput{
+		SourceExecutable: source, APIBase: agent.DefaultAPI, MixBearer: mixBearer,
+		MixLogin: mixLogin, CNPJ: cnpj, MachineID: machineID,
+		IntegratorPath: installer.TargetEXE, WindowsUser: windowsUser, AgentVersion: installer.Version,
+	})
+	if err != nil {
+		return fail("O Integrador foi configurado, mas o Mix Agent nao foi instalado: %v", err)
+	}
+	if !agent.Running() {
+		return fail("O servico Mix Agent nao confirmou que esta em execucao.")
+	}
+	progress("Mix Agent instalado; o robo ja pode ser controlado pelo painel")
+	return nil
 }
 
 func (installer *Installer) InstallMonitor(progress func(string)) error {
