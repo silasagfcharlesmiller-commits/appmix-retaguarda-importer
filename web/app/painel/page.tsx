@@ -24,6 +24,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MonitorCheck,
   Pause,
   Play,
   RefreshCw,
@@ -749,6 +750,9 @@ export default function PainelPage() {
           </a>
           <a href="/painel/consulta-sql">
             <Database size={19} /> Consulta SQL
+          </a>
+          <a href="/painel/robos">
+            <MonitorCheck size={19} /> Robôs dos clientes
           </a>
           <a href="/painel/integracoes">
             <Bot size={19} /> API Hermes
