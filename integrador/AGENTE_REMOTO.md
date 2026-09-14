@@ -74,8 +74,10 @@ O resultado fica em:
 integrador\entrega-agente\Instalador-Mix-Fiscal-Agente-Preview.exe
 ```
 
-Essa prévia depende das rotas da mesma branch. Enquanto o site não for homologado e publicado, ela
-não deve ser executada em cliente.
+As rotas do painel e da API foram publicadas no site em 14/09/2026 pelo commit `5eb959f` da
+`main`. A prévia usa diretamente
+`https://appmix-retaguarda-importer.vercel.app/api/agents`, mas deve continuar restrita à máquina
+de homologação até o fluxo completo ser aprovado.
 
 ## Validação antes da homologação
 
