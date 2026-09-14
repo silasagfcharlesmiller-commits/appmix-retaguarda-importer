@@ -157,9 +157,9 @@ export async function listAgents(ownerId: number) {
   return (await query(`SELECT a.id,BTRIM(a.cnpj) AS cnpj,a.machine_id,a.computer_name,a.windows_user,a.integrator_path,
       a.agent_version,a.desired_state,a.integrator_online,a.session_ready,a.last_seen,a.created_at,a.updated_at,
       CASE WHEN a.last_seen>NOW()-INTERVAL '75 seconds' THEN TRUE ELSE FALSE END AS agent_online,
-      c.action AS last_action,c.status AS last_command_status,c.result_message AS last_result,c.requested_at AS last_command_at
+      c.id AS last_command_id,c.action AS last_action,c.status AS last_command_status,c.result_message AS last_result,c.requested_at AS last_command_at
     FROM public.mix_agents a LEFT JOIN LATERAL (
-      SELECT action,status,result_message,requested_at FROM public.mix_agent_commands WHERE agent_id=a.id ORDER BY id DESC LIMIT 1
+      SELECT id,action,status,result_message,requested_at FROM public.mix_agent_commands WHERE agent_id=a.id ORDER BY id DESC LIMIT 1
     ) c ON TRUE WHERE a.owner_id=$1 ORDER BY a.last_seen DESC NULLS LAST,a.computer_name`, [ownerId])).rows;
 }
 
@@ -169,8 +169,11 @@ export async function queueCommand(ownerId: number, agentId: string, action: str
   const state = action === "pause" ? "paused" : "running";
   if (!states.has(state)) throw new Error("Estado invalido.");
   return transaction(async (client) => {
-    const found = await client.query("UPDATE public.mix_agents SET desired_state=$1,updated_at=NOW() WHERE id=$2 AND owner_id=$3 RETURNING id", [state, agentId, ownerId]);
+    const found = await client.query("SELECT id FROM public.mix_agents WHERE id=$1 AND owner_id=$2 FOR UPDATE", [agentId, ownerId]);
     if (!found.rowCount) throw new Error("Agente nao encontrado.");
+    const active = await client.query("SELECT id FROM public.mix_agent_commands WHERE agent_id=$1 AND status IN ('pending','delivered') ORDER BY id DESC LIMIT 1", [agentId]);
+    if (active.rowCount) throw new Error("Ja existe um comando em andamento para este Agente. Aguarde a conclusao.");
+    await client.query("UPDATE public.mix_agents SET desired_state=$1,updated_at=NOW() WHERE id=$2", [state, agentId]);
     const command = await client.query("INSERT INTO public.mix_agent_commands(agent_id,action,requested_by) VALUES($1,$2,$3) RETURNING id,action,status,requested_at", [agentId, action, actor.slice(0, 180)]);
     return command.rows[0];
   });
