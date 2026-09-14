@@ -112,25 +112,10 @@ if not exist "%PASTA_MIX%\monitor_mix.ps1" (
     echo ERRO: monitor_mix.ps1 nao foi encontrado em %PASTA_MIX%.
     exit /b 2
 )
-if not exist "%PASTA_MIX%\run_silent.vbs" (
-    echo ERRO: run_silent.vbs nao foi encontrado em %PASTA_MIX%.
-    exit /b 2
-)
 if not exist "%PASTA_MIX%\atualizador_mix.ps1" (
     echo ERRO: atualizador_mix.ps1 nao foi encontrado em %PASTA_MIX%.
     exit /b 2
 )
-exit /b 0
-
-:GERAR_LANCADOR
-:: A opcao 5 remove este arquivo. A opcao 2 sempre o recria para permitir
-:: instalar novamente o monitor sem precisar executar o setup outra vez.
-> "%PASTA_MIX%\run_silent.vbs" echo Set shell = CreateObject("WScript.Shell"^)
->> "%PASTA_MIX%\run_silent.vbs" echo Set fileSystem = CreateObject("Scripting.FileSystemObject"^)
->> "%PASTA_MIX%\run_silent.vbs" echo folder = fileSystem.GetParentFolderName(WScript.ScriptFullName^)
->> "%PASTA_MIX%\run_silent.vbs" echo command = "powershell.exe -ExecutionPolicy Bypass -NoProfile -File """ ^& folder ^& "\monitor_mix.ps1"""
->> "%PASTA_MIX%\run_silent.vbs" echo shell.Run command, 0, False
-if not exist "%PASTA_MIX%\run_silent.vbs" exit /b 2
 exit /b 0
 
 :INSTALAR
@@ -140,14 +125,6 @@ echo              INSTALANDO / ATIVANDO MONITORAMENTO AUTOMATICO
 echo ============================================================================
 echo.
 echo [1/2] Validando os componentes em: %PASTA_MIX%...
-call :GERAR_LANCADOR
-if errorlevel 1 (
-    echo ERRO: nao foi possivel criar run_silent.vbs em %PASTA_MIX%.
-    if /I "%~1"=="--install-monitor" exit /b 2
-    echo.
-    pause
-    goto MENU
-)
 call :VALIDAR_SCRIPTS
 if errorlevel 1 (
     if /I "%~1"=="--install-monitor" exit /b 2
@@ -161,9 +138,12 @@ call schtasks /end /tn "%NOME_TAREFA%" >nul 2>&1
 call schtasks /delete /tn "%NOME_TAREFA%" /f >nul 2>&1
 call schtasks /end /tn "%NOME_TAREFA_ANTIGA%" >nul 2>&1
 call schtasks /delete /tn "%NOME_TAREFA_ANTIGA%" /f >nul 2>&1
+:: Remove o lancador legado que alguns antivirus classificavam como suspeito.
+del /f /q "%PASTA_MIX%\run_silent.vbs" >nul 2>&1
 :: A conta ja foi validada pelo setup. /IT usa o token da sessao conectada e
 :: evita pedir uma senha invisivel dentro do instalador.
-call schtasks /create /tn "%NOME_TAREFA%" /tr "wscript.exe \"%PASTA_MIX%\run_silent.vbs\"" /sc minute /mo 5 /it /rl HIGHEST /f
+:: O PowerShell roda oculto e nao cria janela preta de CMD durante o uso.
+call schtasks /create /tn "%NOME_TAREFA%" /tr "powershell.exe -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File \"%PASTA_MIX%\monitor_mix.ps1\"" /sc minute /mo 5 /it /rl HIGHEST /f
 set "RESULTADO_TAREFA=%errorLevel%"
 
 :: Reativa as tarefas nativas que o Integrador possa ter criado.
@@ -232,13 +212,13 @@ if errorlevel 1 set /a FALHAS_LIMPEZA+=1
 
 echo.
 if "!FALHAS_LIMPEZA!"=="0" (
-    echo SUCESSO: Tarefas do monitor e arquivo VBS foram removidos.
+    echo SUCESSO: Tarefas do monitor foram removidas.
     echo As tarefas nativas do Integrador foram desativadas para manutencao.
 ) else (
     echo ATENCAO: !FALHAS_LIMPEZA! item^(ns^) nao puderam ser removidos.
     echo Execute novamente como administrador e confira as mensagens acima.
 )
-echo A opcao 2 pode recriar o VBS e instalar o monitor novamente.
+echo A opcao 2 pode instalar o monitor novamente sem VBS.
 echo.
 if /I "%~1"=="--stop-monitor" exit /b !FALHAS_LIMPEZA!
 pause
@@ -262,7 +242,7 @@ exit /b 0
 
 :REMOVER_ARQUIVO
 if not exist "%~1" (
-    echo [OK] Arquivo VBS ja estava ausente: %~nx1
+    echo [OK] Arquivo legado ja estava ausente: %~nx1
     exit /b 0
 )
 del /f /q "%~1" >nul 2>&1
@@ -270,7 +250,7 @@ if exist "%~1" (
     echo [ERRO] Nao foi possivel excluir: %~1
     exit /b 1
 )
-echo [OK] Arquivo VBS excluido: %~nx1
+echo [OK] Arquivo legado excluido: %~nx1
 exit /b 0
 
 :STATUS

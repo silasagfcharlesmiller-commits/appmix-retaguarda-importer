@@ -41,7 +41,7 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $installer) -Force | Out-
 
 $componentNames = @(
     'desktop-integrador.exe', 'Painel_Mix.bat', 'atualizador_mix.ps1',
-    'monitor_mix.ps1', 'run_silent.vbs', 'integrador_version.json'
+    'monitor_mix.ps1', 'integrador_version.json'
 )
 $payload = [ordered]@{ version = $version; files = [ordered]@{} }
 foreach ($name in $componentNames) {

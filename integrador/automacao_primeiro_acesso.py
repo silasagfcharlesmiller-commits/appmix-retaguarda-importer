@@ -181,7 +181,7 @@ def prepare_files(progress: Progress, diagnostics: InstallationDiagnostics | Non
     installed = {TARGET_EXE.name: _copy_verified(source_exe, TARGET_EXE)}
     for name in (
         "Painel_Mix.bat", "atualizador_mix.ps1", "monitor_mix.ps1",
-        "run_silent.vbs", "integrador_version.json",
+        "integrador_version.json",
     ):
         destination = TARGET_DIR / name
         source = _source_asset(name)
@@ -209,11 +209,8 @@ def install_monitor(progress: Progress) -> None:
     monitor_source = _source_asset("monitor_mix.ps1")
     if monitor_source.resolve() != script.resolve():
         shutil.copy2(monitor_source, script)
-    launcher = TARGET_DIR / "run_silent.vbs"
-    launcher_source = _source_asset("run_silent.vbs")
-    if launcher_source.resolve() != launcher.resolve():
-        shutil.copy2(launcher_source, launcher)
-    if not script.is_file() or not launcher.is_file():
+    (TARGET_DIR / "run_silent.vbs").unlink(missing_ok=True)
+    if not script.is_file():
         raise InstallError("Os arquivos do monitor não foram instalados.")
 
     panel = TARGET_DIR / "Painel_Mix.bat"

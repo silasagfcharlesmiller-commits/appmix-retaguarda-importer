@@ -1,6 +1,6 @@
 # Status da automação do Integrador
 
-Atualizado em 2026-09-11 na branch `main`.
+Atualizado em 2026-09-14 na branch `main`.
 
 ## Candidata atual
 
@@ -28,18 +28,16 @@ Atualizado em 2026-09-11 na branch `main`.
 - reaproveitamento idempotente do Machine ID existente;
 - geração única pela interface oficial quando nenhum ID existe;
 - preenchimento de CNPJ, serviço `mixfiscal`, Salvar e Instalar/Iniciar;
-- reaproveitamento da janela já aberta, identificada diretamente pela porta WebView2 mesmo quando
-  o servidor bloqueia consultas CIM; nova abertura somente como contingência;
-- login final, entrada em **Configurações**, segundo login quando solicitado e manutenção dessa
-  tela aberta para conferência;
-- espera da tela real de login antes de preencher as credenciais e restauração da janela do
-  Integrador quando ela estiver minimizada ou oculta na bandeja;
+- automação da janela inicial identificada diretamente pela porta WebView2, mesmo quando o servidor
+  bloqueia consultas CIM;
+- login, entrada em **Configurações**, preenchimento do CNPJ e serviço, salvamento e instalação;
+- finalização sem executar ou trazer para frente uma segunda janela do Integrador;
 - monitor instalado por `Painel_Mix.bat --install-monitor` e tarefa consultada;
 - opção 5 do Painel Mix exclui suas tarefas agendadas, remove o VBS, desativa as tarefas nativas
   e valida a limpeza sem impedir uma reinstalação pela opção 2;
 - confirmação de CNPJ, serviço e Machine ID exato na API e espera pelo status online;
 - logs sem credenciais e indicação de ocorrências relacionadas do Microsoft Defender;
-- atualização dos cinco componentes já instalados pelo monitor.
+- atualização dos quatro componentes já instalados pelo monitor, sem VBS.
 
 ## Validações locais concluídas
 

@@ -26,7 +26,6 @@ $componentNames = @(
     'desktop-integrador.exe',
     'Painel_Mix.bat',
     'monitor_mix.ps1',
-    'run_silent.vbs',
     'atualizador_mix.ps1'
 )
 $components = @()

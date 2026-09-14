@@ -69,11 +69,12 @@ Abra `Painel_Mix.bat`:
 - opção 2: instalar/reativar monitoramento;
 - opção 3: iniciar Integrador;
 - opção 4: parar Integrador;
-- opção 5: excluir as tarefas agendadas criadas pelo monitor e o `run_silent.vbs`, além de
-  desativar as tarefas nativas durante a manutenção. A opção 2 recria o arquivo e reativa o
-  monitor quando necessário.
+- opção 5: excluir as tarefas agendadas criadas pelo monitor e qualquer `run_silent.vbs` legado, além de
+  desativar as tarefas nativas durante a manutenção. A opção 2 reinstala a tarefa direta e reativa
+  o monitor quando necessário.
 
-O monitor executa invisível a cada cinco minutos, mantém o Integrador ativo e verifica atualizações.
+O monitor executa invisível a cada cinco minutos pelo Agendador do Windows, sem VBS e sem janela de
+CMD, mantém o Integrador ativo e verifica atualizações.
 
 ## Atualizações
 

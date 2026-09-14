@@ -11,7 +11,6 @@ $allowedFiles = @(
     'desktop-integrador.exe',
     'Painel_Mix.bat',
     'monitor_mix.ps1',
-    'run_silent.vbs',
     'atualizador_mix.ps1'
 )
 
@@ -117,6 +116,7 @@ try {
     if (-not $locked) { return }
 
     $localVersion = [version]'0.0.0'
+    Remove-Item -LiteralPath (Join-Path $work 'run_silent.vbs') -Force -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $versionFile) {
         $localData = Get-Content -LiteralPath $versionFile -Raw -Encoding UTF8 | ConvertFrom-Json
         $localVersion = [version]([string]$localData.version)

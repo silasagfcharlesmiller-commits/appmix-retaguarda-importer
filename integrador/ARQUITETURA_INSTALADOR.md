@@ -1,7 +1,7 @@
 # Arquitetura do Instalador do Integrador Mix Fiscal
 
-Referência técnica atualizada em **2026-09-11** para a branch
-`main`, versão `1.2.7`. Antes de gerar ou publicar, leia também
+Referência técnica atualizada em **2026-09-14** para a branch
+`main`, versão `1.2.8`. Antes de gerar ou publicar, leia também
 [`PUBLICACAO.md`](PUBLICACAO.md) e confirme o branch e o `git status`.
 
 ## Decisão de tecnologia
@@ -25,7 +25,7 @@ Instalador-Mix-Fiscal.exe (Inno Setup, elevado)
        -> diagnóstico Windows e atualização do setup
        -> API Mix + automação CDP/WebSocket
   -> desktop-integrador.exe (Integrador oficial Mix)
-  -> Painel_Mix.bat + monitor_mix.ps1 + run_silent.vbs
+  -> Painel_Mix.bat + monitor_mix.ps1
 ```
 
 O bootstrap existe porque a janela Wails depende do WebView2 para abrir. Ele prepara o Runtime
@@ -66,7 +66,6 @@ desktop-integrador.exe
 Painel_Mix.bat
 atualizador_mix.ps1
 monitor_mix.ps1
-run_silent.vbs
 integrador_version.json
 .mix-installer\Instalador-Mix-Fiscal-App.exe
 .mix-installer\MixFiscal-Bootstrap.exe
@@ -154,20 +153,15 @@ abrir setup e elevar
   -> confirmar CNPJ, serviço e Machine ID exato pela API
   -> conferir o mesmo ID nos dois arquivos locais
   -> esperar o ID exato ficar online
-  -> localizar pelo WebView2 a janela que já está aberta e aproveitá-la
-  -> abrir uma janela nova somente quando nenhuma interface estiver disponível
-  -> aguardar a tela real de login ou a navegação autenticada ficar pronta
-  -> autenticar novamente, abrir Configurações e confirmar o segundo login quando solicitado
-  -> restaurar e trazer para frente a janela quando estiver minimizada ou oculta na bandeja
-  -> manter o Integrador aberto em Configurações para conferência
+  -> concluir sem abrir uma segunda janela do Integrador
 ```
 
 A automação usa Chrome DevTools Protocol diretamente por WebSocket em
 `go-installer/internal/installer/cdp.go`. A porta é ligada no Registro apenas durante o fluxo e o
 valor anterior é restaurado no `defer`, inclusive em falha. Ele permanece configurado até a
-conferência final, permitindo aproveitar inclusive uma instância substituída pelas tarefas nativas.
-A porta WebView2 comprova a interface em máquinas que bloqueiam consultas de processo via CIM. A
-etapa repete os logins necessários e só conclui depois de confirmar **Configurações** aberta.
+validação final do cadastro e do estado online.
+A porta WebView2 comprova a interface em máquinas que bloqueiam consultas de processo via CIM. Após
+salvar, instalar e validar o cadastro, o instalador encerra sem trazer outra janela para frente.
 
 ## Machine ID e idempotência
 
@@ -189,23 +183,24 @@ acompanha apenas o ID usado nesta instalação.
 ## Monitor e manutenção
 
 O Go chama `Painel_Mix.bat --install-monitor` e depois consulta a tarefa
-`Mix Fiscal - Monitorar Integrador`. O BAT usa `wscript.exe`/`run_silent.vbs`, sem janela piscando.
+`Mix Fiscal - Monitorar Integrador`. A tarefa chama `powershell.exe` com `-WindowStyle Hidden`
+diretamente, sem VBS e sem janela de CMD.
 
 No painel manual:
 
 - opção 2 instala ou reativa o monitor e as tarefas nativas;
 - opção 3 inicia o Integrador;
 - opção 4 para o Integrador;
-- opção 5 encerra e exclui as tarefas criadas pelo monitor, remove `run_silent.vbs`, verifica a
+- opção 5 encerra e exclui as tarefas criadas pelo monitor, remove qualquer VBS legado, verifica a
   limpeza e desativa `BootStart`, `Startup` e `Watchdog`. As tarefas nativas são preservadas para
-  que a opção 2 possa reativá-las; o VBS é recriado automaticamente.
+  que a opção 2 possa reativá-las.
 
 O monitor roda a cada cinco minutos, mantém o Integrador ativo e chama o atualizador.
 
 ## Atualizações
 
 `atualizador_mix.ps1` baixa e repara `desktop-integrador.exe`, `Painel_Mix.bat`,
-`monitor_mix.ps1`, `run_silent.vbs` e ele próprio. Cada arquivo exige HTTPS no host autorizado,
+`monitor_mix.ps1` e ele próprio. Cada arquivo exige HTTPS no host autorizado,
 tamanho e SHA-256. A troca usa backup e restauração.
 
 A interface Go também consulta a seção `installer` do manifesto. Se houver versão superior, baixa

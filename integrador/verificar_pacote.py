@@ -55,7 +55,7 @@ def main() -> int:
     files = manifest.get("files", {})
     required = {
         "desktop-integrador.exe", "Painel_Mix.bat", "atualizador_mix.ps1",
-        "monitor_mix.ps1", "run_silent.vbs", "integrador_version.json",
+        "monitor_mix.ps1", "integrador_version.json",
     }
     if set(files) != required:
         raise RuntimeError("O manifesto interno não contém exatamente os componentes esperados.")

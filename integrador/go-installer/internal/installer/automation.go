@@ -514,7 +514,7 @@ func automateUI(cnpj, username, password, expectedID string, progress func(strin
 	if page.VisibleText("Dashboard", "a,button", false) {
 		_ = page.ClickText("Dashboard", "a,button", false)
 	}
-	progress("Instalação ativa; o Integrador permanecerá aberto para conferência")
+	progress("Instalação ativa; finalizando sem abrir outra janela do Integrador")
 	return machineID, nil
 }
 
@@ -615,9 +615,7 @@ func (installer *Installer) runInstall(cnpj, username, password string, diagnost
 		return InstallResult{}, machineID, err
 	}
 	diagnostics.Event("cadastro", "ok", "CNPJ, serviço Mix Fiscal e Machine ID confirmados", nil)
-	if err := installer.OpenIntegratorAuthenticatedForReview(username, password, diagnostics, progress); err != nil {
-		return InstallResult{}, machineID, err
-	}
+	diagnostics.Event("processo", "ok", "Instalação concluída sem forçar uma segunda abertura do Integrador", nil)
 	return InstallResult{CNPJ: normalizedCNPJ, MachineID: machineID, Monitor: monitorTask}, machineID, nil
 }
 

@@ -37,8 +37,10 @@ Source: "{#SourceDir}\desktop-integrador.exe"; DestDir: "{app}"; Flags: ignoreve
 Source: "{#SourceDir}\Painel_Mix.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\atualizador_mix.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\monitor_mix.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\run_silent.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\integrador_version.json"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+Type: files; Name: "{app}\run_silent.vbs"
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);

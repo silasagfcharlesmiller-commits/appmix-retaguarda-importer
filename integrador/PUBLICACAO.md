@@ -47,7 +47,7 @@ O script:
 
 - copia o Integrador oficial para a origem e a pasta pública;
 - atualiza `integrador_version.json` e o manifesto público sem BOM;
-- registra tamanho e SHA-256 dos cinco componentes atualizáveis;
+- registra tamanho e SHA-256 dos quatro componentes atualizáveis;
 - executa testes Go;
 - compila `MixFiscal-Bootstrap.exe` e `Instalador-Mix-Fiscal-App.exe` nativos;
 - incorpora HTML/CSS/JavaScript na interface Wails;
@@ -133,7 +133,6 @@ O monitor atualiza automaticamente, a cada cinco minutos:
 - `desktop-integrador.exe`;
 - `Painel_Mix.bat`;
 - `monitor_mix.ps1`;
-- `run_silent.vbs`;
 - `atualizador_mix.ps1`.
 
 A interface Wails também atualiza o próprio setup ao ser aberta quando encontra versão remota

@@ -66,11 +66,12 @@ class InstallerTests(unittest.TestCase):
         self.assertIn(b"--stop-monitor", panel)
         self.assertIn(b"RESULTADO_TAREFA", panel)
         self.assertIn(b"VERSAO_INSTALADA", panel)
-        self.assertIn(b"wscript.exe", panel)
+        self.assertNotIn(b"wscript.exe", panel)
+        self.assertIn(b"-WindowStyle Hidden", panel)
         self.assertIn(b"-ArgumentList '%~1'", panel)
         self.assertIn(b"-Wait -PassThru", panel)
         self.assertIn(b"/it /rl HIGHEST", panel)
-        self.assertIn(b":GERAR_LANCADOR", panel)
+        self.assertNotIn(b":GERAR_LANCADOR", panel)
         self.assertIn(b":REMOVER_TAREFA", panel)
         self.assertIn(b":REMOVER_ARQUIVO", panel)
         self.assertIn(b'del /f /q "%~1"', panel)
@@ -86,10 +87,12 @@ class InstallerTests(unittest.TestCase):
         publisher = (root / "PUBLICAR_ATUALIZACAO.ps1").read_text(encoding="utf-8-sig")
         for name in (
             "desktop-integrador.exe", "Painel_Mix.bat", "monitor_mix.ps1",
-            "run_silent.vbs", "atualizador_mix.ps1",
+            "atualizador_mix.ps1",
         ):
             self.assertIn(name, updater)
             self.assertIn(name, publisher)
+        self.assertNotIn("'run_silent.vbs',", updater)
+        self.assertNotIn("'run_silent.vbs',", publisher)
         self.assertIn("$allowedFiles", updater)
         self.assertIn("[System.IO.File]::Replace", updater)
         self.assertIn("schema = 2", publisher)
