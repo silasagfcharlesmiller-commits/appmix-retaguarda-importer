@@ -1,175 +1,102 @@
-const $ = (selector) => document.querySelector(selector);
-
-const ui = {
-  form: $('#installForm'),
-  cnpj: $('#cnpj'),
-  username: $('#username'),
-  password: $('#password'),
-  togglePassword: $('#togglePassword'),
-  checkButton: $('#checkButton'),
-  installButton: $('#installButton'),
-  heroStateText: $('#heroStateText'),
-  statusMessage: $('#statusMessage'),
-  progressBar: $('#progressBar'),
-  modal: $('#modal'),
-  modalBox: $('#modal .modal'),
-  modalTitle: $('#modalTitle'),
-  modalMessage: $('#modalMessage'),
-  modalIcon: $('#modalIcon'),
-};
-
-let environmentReady = false;
-let operationRunning = false;
-let pollTimer = null;
-
-function backend() {
-  return window.go?.installer?.App;
-}
+const $ = selector => document.querySelector(selector);
+const backend = () => window.go?.installer?.App;
+let environmentReady = false, operationRunning = false, latestReport = null;
+const labels = ['Administrador', 'Conta do Windows', 'Pastas e credencial protegida', 'Agendador de Tarefas', 'WebView2', 'Antivírus e proteção', 'API e controle do agente'];
 
 function setMode(mode, message) {
-  document.body.classList.remove('busy', 'ready', 'error');
-  document.body.classList.add(mode);
-  ui.heroStateText.textContent = mode === 'busy' ? 'Operação em andamento' : mode === 'error' ? 'Ação necessária' : 'Ambiente preparado';
-  ui.statusMessage.textContent = message;
-  ui.progressBar.classList.toggle('indeterminate', mode === 'busy');
-  if (mode === 'ready') ui.progressBar.style.width = '100%';
-  if (mode === 'error') ui.progressBar.style.width = '100%';
+  document.body.classList.remove('busy', 'ready', 'error'); document.body.classList.add(mode);
+  $('#heroStateText').textContent = mode === 'busy' ? 'Operação em andamento' : mode === 'error' ? 'Ação necessária' : 'Verificação concluída';
+  $('#statusMessage').textContent = message;
+  $('#progressBar').classList.toggle('indeterminate', mode === 'busy');
+  if (mode !== 'busy') $('#progressBar').style.width = '100%';
 }
-
 function setBusy(busy) {
   operationRunning = busy;
-  for (const element of [ui.cnpj, ui.username, ui.password, ui.togglePassword, ui.checkButton]) {
-    element.disabled = busy;
-  }
-  ui.installButton.disabled = busy || !environmentReady;
+  for (const id of ['cnpj','username','password','clientName','retaguarda','togglePassword','checkButton','prepareButton','defenderExclusion']) $('#'+id).disabled = busy;
+  $('#installButton').disabled = busy || !environmentReady;
+  $('#agentOnlyButton').disabled = busy;
 }
-
 function showModal(title, message, error = false) {
-  ui.modalTitle.textContent = title;
-  ui.modalMessage.textContent = message;
-  ui.modalIcon.textContent = error ? '!' : '✓';
-  ui.modalBox.classList.toggle('error', error);
-  ui.modal.hidden = false;
-  $('#modalClose').focus();
+  $('#modalTitle').textContent = title; $('#modalMessage').textContent = message;
+  $('#modalIcon').textContent = error ? '!' : '✓'; $('#modal .modal').classList.toggle('error', error);
+  $('#modal').hidden = false; $('#modalClose').focus();
 }
-
-function formatCNPJ(value) {
-  const digits = value.replace(/\D/g, '').slice(0, 14);
-  return digits
-    .replace(/^(\d{2})(\d)/, '$1.$2')
-    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1/$2')
-    .replace(/(\d{4})(\d)/, '$1-$2');
+function renderChecks(checks = []) {
+  $('#checks').replaceChildren();
+  labels.forEach((label, index) => {
+    const check = checks[index] || {label, status:'pending', message:'Aguardando verificação'};
+    const row = document.createElement('li'); row.className = `check-${check.status}`;
+    const title = document.createElement('strong');
+    title.textContent = `${({ok:'✓',error:'✕',warning:'!',pending:'○'})[check.status] || '○'} ${index+1}. ${check.label}`;
+    const detail = document.createElement('span'); detail.textContent = check.message;
+    row.append(title, detail); $('#checks').append(row);
+  });
 }
-
+function reportText(report = latestReport) {
+  if (!report) return 'O relatório estará disponível ao finalizar a verificação.';
+  return (report.checks || []).map((c,i) => `${i+1}. ${c.label} — ${c.status === 'ok' ? 'APROVADO' : c.status === 'error' ? 'BLOQUEIO CONFIRMADO' : 'PENDENTE / ATENÇÃO'}\n${c.message}`).join('\n\n') + (report.warning ? '\n\nPendência da instalação:\n'+report.warning : '') + (report.preparation?.length ? '\n\nPreparação do Windows:\n' + report.preparation.join('\n') : '') + `\n\nRelatório salvo para a TI:\n${report.diagnostic || 'aguardando gravação'}`;
+}
 function fillReport(report) {
-  $('#installerVersion').textContent = report.installer_version || '—';
-  $('#availableVersion').textContent = report.available_version || 'indisponível';
+  latestReport = report; renderChecks(report.checks);
+  const facts = {installerVersion:'installer_version',availableVersion:'available_version',webviewVersion:'webview2_version',monitorStatus:'monitor',adminStatus:'run_as_admin'};
+  for (const [id,key] of Object.entries(facts)) $('#'+id).textContent = report[key] || '—';
   $('#integratorVersion').textContent = `${report.integrator_release || '—'} · ${report.integrator_file_version || '—'}`;
-  $('#webviewVersion').textContent = report.webview2_version || 'não instalado';
-  $('#monitorStatus').textContent = report.monitor || 'não instalado';
-  $('#adminStatus').textContent = report.run_as_admin || 'não configurado';
   $('#machineAccount').textContent = `Conta ativa: ${report.interactive_user || 'não identificada'}`;
-  $('#targetDirectory').textContent = report.target_dir || '';
-  $('#targetDirectory').title = report.target_dir || '';
+  $('#targetDirectory').textContent = report.target_dir || ''; $('#targetDirectory').title = report.target_dir || '';
 }
-
-async function waitForBackend() {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (backend()) return;
-    await new Promise(resolve => setTimeout(resolve, 50));
-  }
-  throw new Error('A ponte local do instalador não ficou disponível.');
-}
-
 async function checkEnvironment() {
   if (operationRunning) return;
-  setBusy(true);
-  environmentReady = false;
-  setMode('busy', 'Verificando conta do Windows, AppData, WebView2 e Agendador...');
+  environmentReady = false; setBusy(true); renderChecks();
+  setMode('busy','Executando os sete testes e reunindo os resultados...');
   try {
-    const report = await backend().CheckEnvironment();
-    fillReport(report);
-    environmentReady = true;
-    setMode('ready', 'Ambiente liberado. Informe os dados e inicie a instalação.');
+    const report = await backend().CheckEnvironment(); fillReport(report); environmentReady = report.ready;
+    setMode(report.ready ? 'ready' : 'error', report.ready ? 'Verificação inicial concluída. Avisos não bloqueiam a instalação; o controle remoto será testado ao final.' : 'Há bloqueios confirmados. Confira todos os testes e o relatório para a TI.');
+    if (!report.ready) showModal('Relatório do ambiente', reportText(report), true);
+  } catch (error) { setMode('error','Diagnóstico indisponível'); showModal('Diagnóstico indisponível',String(error?.message || error),true); }
+  finally { setBusy(false); }
+}
+async function install(event, agentOnly = false) {
+  event?.preventDefault(); if (operationRunning) return;
+  if (!$('#cnpj').value || !$('#username').value.trim() || !$('#password').value) { showModal('Dados incompletos','Informe o CNPJ, o login e a senha do Integrador.',true); return; }
+  if (agentOnly) {
+    try { const selected = await backend().SelectExistingIntegrator(); if (!selected) return; await checkEnvironment(); }
+    catch (error) { showModal('Seleção do Integrador',String(error?.message || error),true); return; }
+  }
+  if (!environmentReady) return;
+  setBusy(true); setMode('busy',agentOnly ? 'Instalando somente o Agente...' : 'Iniciando instalação...');
+  const poll = setInterval(async () => { try { const state = await backend().State(); if (state?.message) $('#statusMessage').textContent = state.message; } catch (_) {} },700);
+  try {
+    const result = await backend().Install({cnpj:$('#cnpj').value,username:$('#username').value.trim(),password:$('#password').value,agent_only:agentOnly,client_name:$('#clientName').value.trim(),retaguarda:$('#retaguarda').value.trim()});
+    latestReport = {...latestReport,checks:result.checks,diagnostic:result.diagnostic,warning:result.warning}; renderChecks(result.checks);
+    const complete = result.agent_verified && !result.warning;
+    setMode(complete ? 'ready' : 'error',complete ? 'Instalação concluída; início e reinício confirmados pela API.' : 'Instalado com pendência. Confira as orientações no relatório.');
+    showModal(complete ? 'Instalação e controle confirmados' : 'Instalado com pendência',`CNPJ: ${result.cnpj}\nMachine ID: ${result.machine_id}\n\n${result.warning || 'O serviço recebeu e executou início e reinício pela API.'}\n\n${reportText()}`,!complete);
   } catch (error) {
-    environmentReady = false;
-    const message = String(error?.message || error || 'Não foi possível verificar o ambiente.');
-    setMode('error', 'A verificação encontrou um bloqueio. Consulte a orientação exibida.');
-    showModal('Ambiente não liberado', message, true);
-  } finally {
-    setBusy(false);
-  }
+    try { latestReport = await backend().LastReport(); renderChecks(latestReport.checks); } catch (_) {}
+    setMode('error','A instalação encontrou um bloqueio. Confira o relatório completo.');
+    showModal('Relatório da instalação',`${String(error?.message || error)}\n\n${reportText()}`,true);
+  } finally { $('#password').value = ''; clearInterval(poll); setBusy(false); }
 }
-
-async function pollState() {
-  try {
-    const state = await backend().State();
-    if (state?.message && operationRunning) ui.statusMessage.textContent = state.message;
-  } catch (_) {}
-}
-
-async function install(event) {
-  event.preventDefault();
-  if (!environmentReady || operationRunning) return;
-  if (!ui.cnpj.value || !ui.username.value.trim() || !ui.password.value) {
-    showModal('Dados incompletos', 'Informe o CNPJ, o login e a senha do Integrador.', true);
-    return;
-  }
-  setBusy(true);
-  setMode('busy', 'Iniciando instalação segura...');
-  pollTimer = setInterval(pollState, 450);
-  try {
-    const result = await backend().Install({
-      cnpj: ui.cnpj.value,
-      username: ui.username.value.trim(),
-      password: ui.password.value,
-    });
-    ui.password.value = '';
-    environmentReady = true;
-    setMode('ready', 'Instalação concluída e monitoramento ativo.');
-    showModal('Instalação concluída', `CNPJ ${result.cnpj} configurado com Mix Fiscal.\n\nMachine ID: ${result.machine_id}\n\nO ID está online, o Integrador foi aberto e o monitor foi instalado.`);
-    setBusy(false);
-    await checkEnvironment();
-  } catch (error) {
-    ui.password.value = '';
-    const message = String(error?.message || error || 'A instalação não foi concluída.');
-    setMode('error', 'A instalação não foi concluída. Revise o diagnóstico.');
-    showModal('Erro na instalação', message, true);
-  } finally {
-    clearInterval(pollTimer);
-    pollTimer = null;
-    setBusy(false);
-  }
-}
-
-ui.cnpj.addEventListener('input', () => { ui.cnpj.value = formatCNPJ(ui.cnpj.value); });
-ui.togglePassword.addEventListener('click', () => {
-  const visible = ui.password.type === 'text';
-  ui.password.type = visible ? 'password' : 'text';
-  ui.togglePassword.title = visible ? 'Mostrar senha' : 'Ocultar senha';
-  ui.togglePassword.setAttribute('aria-label', ui.togglePassword.title);
+$('#prepareButton').addEventListener('click',async () => {
+  if (operationRunning) return; setBusy(true); setMode('busy','Preparando as pastas e executando os testes...');
+  try { const report = await backend().PrepareWindows($('#defenderExclusion').checked); fillReport(report); environmentReady = report.ready; setMode(report.ready ? 'ready' : 'error','Preparação finalizada. Confira o relatório.'); showModal('Resultado da preparação',reportText(report),!report.ready); }
+  catch (error) { showModal('Preparação não concluída',String(error?.message || error),true); }
+  finally { setBusy(false); }
 });
-ui.checkButton.addEventListener('click', checkEnvironment);
-ui.form.addEventListener('submit', install);
-$('#modalClose').addEventListener('click', () => { ui.modal.hidden = true; });
-ui.modal.addEventListener('click', event => { if (event.target === ui.modal) ui.modal.hidden = true; });
-
-window.addEventListener('DOMContentLoaded', async () => {
+$('#cnpj').addEventListener('input',() => { $('#cnpj').value = $('#cnpj').value.replace(/\D/g,'').slice(0,14).replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2'); });
+$('#togglePassword').addEventListener('click',() => { $('#password').type = $('#password').type === 'text' ? 'password' : 'text'; });
+$('#checkButton').addEventListener('click',checkEnvironment);
+$('#agentOnlyButton').addEventListener('click',event => install(event,true));
+$('#installForm').addEventListener('submit',event => install(event));
+$('#reportButton').addEventListener('click',() => showModal('Relatório completo para a TI',reportText()));
+$('#modalClose').addEventListener('click',() => { $('#modal').hidden = true; });
+$('#modal').addEventListener('click',event => { if (event.target === $('#modal')) $('#modal').hidden = true; });
+window.addEventListener('DOMContentLoaded',async () => {
+  renderChecks(); setBusy(true);
   try {
-    await waitForBackend();
-    try {
-      const updating = await backend().CheckInstallerUpdate();
-      if (updating) {
-        setMode('busy', 'Abrindo a versão mais recente do instalador...');
-        return;
-      }
-    } catch (_) {
-      // Uma falha de atualização não impede o uso do pacote local.
-    }
-    await checkEnvironment();
-  } catch (error) {
-    setMode('error', 'O instalador não conseguiu iniciar a ponte local.');
-    showModal('Falha ao iniciar', String(error?.message || error), true);
-  }
+    for (let i=0; !backend() && i<100; i++) await new Promise(resolve => setTimeout(resolve,50));
+    if (!backend()) throw new Error('A ponte local do instalador não ficou disponível.');
+    try { if (await backend().CheckInstallerUpdate()) { setMode('busy','Abrindo a versão mais recente do instalador...'); return; } } catch (_) {}
+    setBusy(false); await checkEnvironment();
+  } catch (error) { setBusy(false); setMode('error','Falha ao iniciar'); showModal('Falha ao iniciar',String(error?.message || error),true); }
 });

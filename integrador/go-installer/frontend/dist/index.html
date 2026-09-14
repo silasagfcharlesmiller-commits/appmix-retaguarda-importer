@@ -36,6 +36,8 @@
         </div>
 
         <form id="installForm" novalidate>
+          <label class="field"><span>Nome do cliente</span><div class="input-wrap"><input id="clientName" maxlength="180" placeholder="Razão social ou nome fantasia"></div></label>
+          <label class="field"><span>Retaguarda (opcional)</span><div class="input-wrap"><input id="retaguarda" maxlength="180" placeholder="Sistema de retaguarda do cliente"></div></label>
           <label class="field">
             <span>CNPJ</span>
             <div class="input-wrap">
@@ -74,10 +76,17 @@
               Verificar novamente
             </button>
             <button class="primary-button" id="installButton" type="submit" disabled>
-              <span>Instalar Integrador e Monitor</span>
+              <span>Instalar Integrador e Agente</span>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13.2 5.2 5.4 5.4H3v2.8h15.6l-5.4 5.4 2 2L24 12l-8.8-8.8-2 2Z"/></svg>
             </button>
           </div>
+          <button class="secondary-button agent-only-button" id="agentOnlyButton" type="button" disabled>Instalar somente Agente em um Integrador existente</button>
+          <p class="privacy-note">O teste final executa início e reinício do Integrador selecionado. Use quando o robô puder ser reiniciado.</p>
+          <details class="preparation"><summary>Preparar Windows e proteção</summary>
+            <p>Prepara as pastas do produto, testa a credencial protegida e configura a execução elevada do Integrador.</p>
+            <label><input id="defenderExclusion" type="checkbox"> Autorizar exceção no Microsoft Defender somente para a pasta do Integrador exibida abaixo. Use uma pasta exclusiva do produto.</label>
+            <button class="secondary-button" id="prepareButton" type="button">Preparar e testar novamente</button>
+          </details>
         </form>
       </article>
 
@@ -93,6 +102,8 @@
           <div class="status-message" id="statusMessage">Preparando verificação segura...</div>
           <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
 
+          <ol id="checks" class="checks" aria-live="polite"></ol>
+          <button id="reportButton" class="secondary-button" type="button">Ver relatório completo para a TI</button>
           <dl class="facts">
             <div><dt>Instalador</dt><dd id="installerVersion">—</dd></div>
             <div><dt>Versão publicada</dt><dd id="availableVersion">—</dd></div>

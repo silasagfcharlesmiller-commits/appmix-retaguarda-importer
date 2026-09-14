@@ -11,12 +11,19 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// The executable stays beside the Integrator. Its protected data lives in a
+// private child folder, so one exception for the Integrator directory covers
+// the product without changing permissions for other systems in that directory.
 func dataDirectory() string {
-	base := os.Getenv("ProgramData")
-	if base == "" {
-		base = `C:\ProgramData`
+	executable, err := os.Executable()
+	if err == nil {
+		return dataDirectoryForExecutable(executable)
 	}
-	return filepath.Join(base, "MixFiscal", "Agent")
+	return dataDirectoryForExecutable(installedExecutable())
+}
+
+func dataDirectoryForExecutable(executable string) string {
+	return filepath.Join(filepath.Dir(filepath.Clean(executable)), ".mixfiscal-agent")
 }
 
 func ConfigPath() string { return filepath.Join(dataDirectory(), "config.json") }
@@ -67,7 +74,11 @@ func unprotectSecret(value string) (string, error) {
 }
 
 func saveConfig(config Config) error {
-	if err := os.MkdirAll(dataDirectory(), 0o700); err != nil {
+	return saveConfigAt(config, dataDirectoryForExecutable(config.AgentExecutable))
+}
+
+func saveConfigAt(config Config, directory string) error {
+	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return err
 	}
 	config.UpdatedAt = nowText()
@@ -76,15 +87,20 @@ func saveConfig(config Config) error {
 		return err
 	}
 	data = append(data, '\n')
-	temporary := ConfigPath() + ".tmp"
+	path := filepath.Join(directory, "config.json")
+	temporary := path + ".tmp"
 	if err := os.WriteFile(temporary, data, 0o600); err != nil {
 		return err
 	}
-	return windows.Rename(temporary, ConfigPath())
+	return windows.Rename(temporary, path)
 }
 
 func loadConfig() (Config, string, error) {
-	data, err := os.ReadFile(ConfigPath())
+	return loadConfigAt(dataDirectory())
+}
+
+func loadConfigAt(directory string) (Config, string, error) {
+	data, err := os.ReadFile(filepath.Join(directory, "config.json"))
 	if err != nil {
 		return Config{}, "", err
 	}
@@ -94,4 +110,11 @@ func loadConfig() (Config, string, error) {
 	}
 	secret, err := unprotectSecret(config.ProtectedSecret)
 	return config, secret, err
+}
+
+func CurrentConfig() (Config, error) { config, _, err := loadConfig(); return config, err }
+
+func CurrentConfigAt(agentExecutable string) (Config, error) {
+	config, _, err := loadConfigAt(dataDirectoryForExecutable(agentExecutable))
+	return config, err
 }

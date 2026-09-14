@@ -11,19 +11,31 @@ const (
 )
 
 type Config struct {
-	APIBase         string `json:"api_base"`
-	AgentID         string `json:"agent_id"`
-	ProtectedSecret string `json:"protected_secret"`
-	CNPJ            string `json:"cnpj"`
-	MachineID       string `json:"machine_id"`
-	IntegratorPath  string `json:"integrator_path"`
-	WindowsUser     string `json:"windows_user"`
-	AgentVersion    string `json:"agent_version"`
-	DesiredState    string `json:"desired_state"`
-	UpdatedAt       string `json:"updated_at"`
+	AgentExecutable  string         `json:"agent_executable"`
+	InstallerSetup   string         `json:"installer_setup"`
+	ManageIntegrator bool           `json:"manage_integrator"`
+	InstallerRuntime string         `json:"installer_runtime"`
+	LastResult       *commandResult `json:"last_result,omitempty"`
+	ResultPending    bool           `json:"result_pending,omitempty"`
+	APIBase          string         `json:"api_base"`
+	AgentID          string         `json:"agent_id"`
+	ProtectedSecret  string         `json:"protected_secret"`
+	CNPJ             string         `json:"cnpj"`
+	MachineID        string         `json:"machine_id"`
+	IntegratorPath   string         `json:"integrator_path"`
+	WindowsUser      string         `json:"windows_user"`
+	AgentVersion     string         `json:"agent_version"`
+	DesiredState     string         `json:"desired_state"`
+	UpdatedAt        string         `json:"updated_at"`
 }
 
 type ProvisionInput struct {
+	AgentExecutable  string
+	InstallerSetup   string
+	ManageIntegrator bool
+	InstallerRuntime string
+	ClientName       string
+	Retaguarda       string
 	SourceExecutable string
 	APIBase          string
 	MixBearer        string
@@ -36,6 +48,8 @@ type ProvisionInput struct {
 }
 
 type enrollmentRequest struct {
+	ClientName     string `json:"client_name"`
+	Retaguarda     string `json:"retaguarda"`
 	MixLogin       string `json:"mix_login"`
 	CNPJ           string `json:"cnpj"`
 	MachineID      string `json:"machine_id"`
@@ -61,11 +75,13 @@ type HeartbeatResponse struct {
 }
 
 type heartbeatRequest struct {
-	AgentVersion     string `json:"agent_version"`
-	IntegratorOnline bool   `json:"integrator_online"`
-	SessionReady     bool   `json:"session_ready"`
-	IntegratorPath   string `json:"integrator_path"`
-	WindowsUser      string `json:"windows_user"`
+	IntegratorObserved bool   `json:"integrator_observed"`
+	Protocol           int    `json:"protocol"`
+	AgentVersion       string `json:"agent_version"`
+	IntegratorOnline   bool   `json:"integrator_online"`
+	SessionReady       bool   `json:"session_ready"`
+	IntegratorPath     string `json:"integrator_path"`
+	WindowsUser        string `json:"windows_user"`
 }
 
 type commandResult struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,13 +25,21 @@ type payloadManifest struct {
 }
 
 type InstallResult struct {
-	CNPJ       string `json:"cnpj"`
-	MachineID  string `json:"machine_id"`
-	Monitor    string `json:"monitor"`
-	Diagnostic string `json:"diagnostic"`
+	AgentInstalled bool               `json:"agent_installed"`
+	CNPJ           string             `json:"cnpj"`
+	MachineID      string             `json:"machine_id"`
+	Monitor        string             `json:"monitor"`
+	Diagnostic     string             `json:"diagnostic"`
+	AgentVerified  bool               `json:"agent_verified"`
+	Warning        string             `json:"warning"`
+	Checks         []EnvironmentCheck `json:"checks"`
 }
 
 type Installer struct {
+	SetupPath  string
+	AgentOnly  bool
+	ClientName string
+	Retaguarda string
 	TargetDir  string
 	TargetEXE  string
 	RuntimeDir string
@@ -46,7 +55,17 @@ func NewInstaller(targetDir, version string) (*Installer, error) {
 	if err != nil {
 		return nil, err
 	}
+	setupPath := ""
+	for index, arg := range os.Args {
+		if arg == "--setup-path" && index+1 < len(os.Args) {
+			path := os.Args[index+1]
+			if filepath.IsAbs(path) && strings.EqualFold(filepath.Ext(path), ".exe") {
+				setupPath = filepath.Clean(path)
+			}
+		}
+	}
 	return &Installer{
+		SetupPath:  setupPath,
 		TargetDir:  targetDir,
 		TargetEXE:  filepath.Join(targetDir, "desktop-integrador.exe"),
 		RuntimeDir: filepath.Dir(runtimeEXE),
@@ -124,7 +143,7 @@ func (installer *Installer) PrepareFiles(diagnostics *Diagnostics, progress func
 	if err := installer.StopIntegrator(); err != nil {
 		diagnostics.Event("processo", "atenção", "Não foi possível consultar/encerrar uma instância anterior", map[string]any{"error": err})
 	}
-	if err := installer.VerifyPayload(); err != nil {
+	if err := installer.CopyPayload(); err != nil {
 		return err
 	}
 	if err := ConfigureRunAsAdmin(installer.TargetEXE); err != nil {
@@ -521,26 +540,134 @@ func automateUI(cnpj, username, password, expectedID string, progress func(strin
 }
 
 func (installer *Installer) Install(cnpj, username, password string, progress func(string)) (InstallResult, error) {
-	diagnostics := NewDiagnostics(installer.TargetDir)
-	result, machineID, err := installer.runInstall(cnpj, username, password, diagnostics, progress)
-	if err != nil {
-		if waitDebugPort(time.Second) == nil || installer.IntegratorRunning() {
-			diagnostics.Event("processo", "atenção", "Integrador mantido aberto para revisão manual após a falha", nil)
-		} else if machineID != "" {
-			if startErr := installer.StartIntegratorVerified(diagnostics, func(string) {}); startErr != nil {
-				diagnostics.Event("processo", "atenção", "Não foi possível reabrir o Integrador após a falha", map[string]any{"error": startErr})
-			}
-		}
-		diagnostics.Event("instalação", "erro", err.Error(), nil)
-		if findings := securityProtectionFindings(installer.TargetDir); findings > 0 {
-			diagnostics.Event("proteção", "atenção", "O Microsoft Defender registrou ocorrência relacionada ao Integrador", map[string]any{"occurrences": findings})
-		}
-		report := diagnostics.Finish("falhou", map[string]any{"error": err.Error()})
-		return InstallResult{}, fail("%s\n\nDiagnóstico salvo em:\n%s", err.Error(), report)
-	}
+	return installer.InstallWithOptions(InstallInput{CNPJ: cnpj, Username: username, Password: password}, progress)
+}
 
-	result.Diagnostic = diagnostics.Finish("concluído", map[string]any{"monitor": monitorTask, "result": "online"})
+func (installer *Installer) InstallWithOptions(input InstallInput, progress func(string)) (InstallResult, error) {
+	installer.ClientName, installer.Retaguarda, installer.AgentOnly = input.ClientName, input.Retaguarda, input.AgentOnly
+	diagnostics := NewDiagnostics(installer.TargetDir)
+	_, checks := environmentChecks(installer.TargetDir, diagnostics, true)
+	var result InstallResult
+	var err error
+	if err = blockingChecks(checks); err == nil {
+		if input.AgentOnly {
+			result, err = installer.installAgentOnly(input, diagnostics, progress)
+		} else {
+			result, _, err = installer.runInstall(input.CNPJ, input.Username, input.Password, diagnostics, progress)
+		}
+	}
+	if err != nil {
+		diagnostics.Event("instalação", "error", err.Error(), nil)
+		report := diagnostics.Finish("falhou", map[string]any{"checks": checks, "error": err.Error()})
+		return InstallResult{Checks: checks, Diagnostic: report, Warning: err.Error()}, fail("%s\n\nRelatório completo para a TI: %s", err, report)
+	}
+	progress("Teste 7/7: validando o controle real pela API")
+	if config, configErr := agent.CurrentConfigAt(filepath.Join(installer.TargetDir, "MixFiscalAgentService.exe")); result.AgentInstalled && configErr == nil && config.CNPJ == result.CNPJ && config.MachineID == result.MachineID && strings.EqualFold(config.IntegratorPath, installer.TargetEXE) {
+		verification, verifyErr := agent.VerifyRemoteControl(context.Background(), config, progress)
+		if verifyErr != nil {
+			result.Warning = strings.TrimSpace(result.Warning + "\n" + verifyErr.Error())
+		} else if !verification.Success {
+			result.Warning = strings.TrimSpace(result.Warning + "\n" + verification.Message)
+		} else {
+			result.AgentVerified = true
+		}
+	} else if result.Warning == "" {
+		result.Warning = "Credencial local do agente não confirmada para este Integrador; controle remoto pendente."
+	}
+	if result.AgentVerified {
+		checks[6].Status = "ok"
+		checks[6].Message = "Serviço recebeu e confirmou início e reinício pela API, com processo aberto."
+	} else {
+		checks[6].Status = "warning"
+		checks[6].Message = result.Warning
+	}
+	diagnostics.Event("agent", checks[6].Status, checks[6].Message, nil)
+	result.Checks = checks
+	status := "concluído"
+	if !result.AgentVerified || result.Warning != "" {
+		status = "instalado_com_pendencia"
+	}
+	result.Diagnostic = diagnostics.Finish(status, map[string]any{"checks": checks, "agent_verified": result.AgentVerified, "warning": result.Warning})
 	return result, nil
+}
+
+func (installer *Installer) installAgentOnly(input InstallInput, diagnostics *Diagnostics, progress func(string)) (InstallResult, error) {
+	cnpj, err := NormalizeCNPJ(input.CNPJ)
+	if err != nil {
+		return InstallResult{}, err
+	}
+	if !hasMZHeader(installer.TargetEXE) {
+		return InstallResult{}, fail("Selecione o desktop-integrador.exe já instalado.")
+	}
+	machineID, err := installer.FindLocalMachineID()
+	if err != nil {
+		return InstallResult{}, err
+	}
+	if machineID == "" {
+		return InstallResult{}, fail("O Integrador existente não possui Machine ID local. Nenhum ID foi criado ou alterado.")
+	}
+	api := NewMixAPI()
+	if err := api.Login(input.Username, input.Password); err != nil {
+		return InstallResult{}, err
+	}
+	if err := api.VerifyRegistration(cnpj, machineID); err != nil {
+		return InstallResult{}, err
+	}
+	identity, err := PreflightEnvironment(installer.TargetDir, diagnostics)
+	if err != nil {
+		return InstallResult{}, err
+	}
+	if err := installer.InstallAgent(context.Background(), api.BearerToken(), input.Username, cnpj, machineID, identity.InteractiveUser, progress); err != nil {
+		return InstallResult{}, err
+	}
+	return InstallResult{CNPJ: cnpj, MachineID: machineID, Monitor: agent.ServiceName, AgentInstalled: true}, nil
+}
+
+// Only the full installation copies the official Integrator payload. Opening the
+// setup or selecting agent-only must never overwrite a customer's executable.
+func (installer *Installer) CopyPayload() error {
+	source := *installer
+	source.TargetDir = filepath.Join(installer.RuntimeDir, "payload")
+	if err := source.VerifyPayload(); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(filepath.Join(installer.RuntimeDir, "payload_manifest.json"))
+	if err != nil {
+		return err
+	}
+	var manifest payloadManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return err
+	}
+	for name := range manifest.Files {
+		input, err := os.Open(filepath.Join(source.TargetDir, name))
+		if err != nil {
+			return err
+		}
+		destination := filepath.Join(installer.TargetDir, name)
+		temporary := destination + ".install-new"
+		output, err := os.Create(temporary)
+		if err != nil {
+			input.Close()
+			return err
+		}
+		_, copyErr := io.Copy(output, input)
+		input.Close()
+		closeErr := output.Close()
+		if copyErr != nil {
+			os.Remove(temporary)
+			return copyErr
+		}
+		if closeErr != nil {
+			os.Remove(temporary)
+			return closeErr
+		}
+		if err := replaceFile(temporary, destination); err != nil {
+			os.Remove(temporary)
+			return err
+		}
+	}
+	return installer.VerifyPayload()
 }
 
 func (installer *Installer) runInstall(cnpj, username, password string, diagnostics *Diagnostics, progress func(string)) (InstallResult, string, error) {
@@ -610,16 +737,19 @@ func (installer *Installer) runInstall(cnpj, username, password string, diagnost
 		return InstallResult{}, machineID, fail("O Machine ID não ficou igual nos dois arquivos locais.")
 	}
 	progress("Aguardando o Machine ID ficar online no App Mix")
+	warning := ""
 	if err := api.WaitUntilOnline(normalizedCNPJ, machineID, 40*time.Second); err != nil {
-		return InstallResult{}, machineID, err
+		warning = "Cadastro confirmado, mas o estado online na API Mix está pendente: " + err.Error()
+		diagnostics.Event("online_mix", "warning", warning, nil)
 	}
 	if err := installer.InstallAgent(context.Background(), api.BearerToken(), username, normalizedCNPJ, machineID, identity.InteractiveUser, progress); err != nil {
-		return InstallResult{}, machineID, err
+		warning = strings.TrimSpace(warning + "\nIntegrador configurado; controle remoto pendente: " + err.Error())
+		return InstallResult{CNPJ: normalizedCNPJ, MachineID: machineID, Warning: warning}, machineID, nil
 	}
 	diagnostics.Event("monitor", "ok", "Servico Mix Agent instalado, vinculado e iniciado", map[string]any{"service": agent.ServiceName})
 	diagnostics.Event("cadastro", "ok", "CNPJ, serviço Mix Fiscal e Machine ID confirmados", nil)
 	diagnostics.Event("processo", "ok", "Instalação concluída sem forçar uma segunda abertura do Integrador", nil)
-	return InstallResult{CNPJ: normalizedCNPJ, MachineID: machineID, Monitor: agent.ServiceName}, machineID, nil
+	return InstallResult{CNPJ: normalizedCNPJ, MachineID: machineID, Monitor: agent.ServiceName, AgentInstalled: true, Warning: warning}, machineID, nil
 }
 
 func (installer *Installer) InstallAgent(ctx context.Context, mixBearer, mixLogin, cnpj, machineID, windowsUser string, progress func(string)) error {
@@ -629,6 +759,8 @@ func (installer *Installer) InstallAgent(ctx context.Context, mixBearer, mixLogi
 		return fail("O executavel nativo do Mix Agent nao foi encontrado ou esta invalido.")
 	}
 	_, err := agent.Provision(ctx, agent.ProvisionInput{
+		AgentExecutable:  filepath.Join(installer.TargetDir, "MixFiscalAgentService.exe"),
+		ManageIntegrator: !installer.AgentOnly, InstallerSetup: installer.SetupPath, InstallerRuntime: installer.RuntimeDir, ClientName: installer.ClientName, Retaguarda: installer.Retaguarda,
 		SourceExecutable: source, APIBase: agent.DefaultAPI, MixBearer: mixBearer,
 		MixLogin: mixLogin, CNPJ: cnpj, MachineID: machineID,
 		IntegratorPath: installer.TargetEXE, WindowsUser: windowsUser, AgentVersion: installer.Version,

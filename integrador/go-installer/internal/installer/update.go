@@ -58,7 +58,7 @@ func validPublicDownload(entry ManifestFile) bool {
 	return err == nil && parsed.Scheme == "https" && strings.EqualFold(parsed.Hostname(), publicHost) && entry.Size > 0 && len(entry.SHA256) == 64
 }
 
-func MaybeStartInstallerUpdate(currentVersion, targetDir string) (bool, error) {
+func MaybeStartInstallerUpdate(currentVersion, targetDir string, originalSetup ...string) (bool, error) {
 	manifest, err := RemoteVersionManifest(5 * time.Second)
 	if err != nil {
 		return false, err
@@ -107,7 +107,11 @@ func MaybeStartInstallerUpdate(currentVersion, targetDir string) (bool, error) {
 			return false, err
 		}
 	}
-	command := exec.Command(destination, "/DIR="+targetDir)
+	args := []string{"/DIR=" + targetDir}
+	if len(originalSetup) > 0 && originalSetup[0] != "" {
+		args = append(args, "/ORIGINSETUP="+originalSetup[0])
+	}
+	command := exec.Command(destination, args...)
 	command.Dir = targetDir
 	if err := command.Start(); err != nil {
 		return false, fail("A nova versão foi baixada, mas o Windows não permitiu abri-la.")

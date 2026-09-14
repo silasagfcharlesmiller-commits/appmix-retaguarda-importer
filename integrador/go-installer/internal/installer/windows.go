@@ -210,9 +210,6 @@ func schedulerOutputRunning(output string) bool {
 }
 
 func probeTaskScheduler() error {
-	if !taskSchedulerRunning() {
-		return fail("O Agendador de Tarefas do Windows não está em execução ou foi bloqueado pela TI.")
-	}
 	random := make([]byte, 6)
 	_, _ = rand.Read(random)
 	name := "Mix Fiscal - Teste Permissao " + hex.EncodeToString(random)
@@ -226,52 +223,6 @@ func probeTaskScheduler() error {
 		return fail("A conta elevada não conseguiu criar uma tarefa interativa no Agendador. Retorno: %s", safeText(string(output), 240))
 	}
 	return nil
-}
-
-func PreflightEnvironment(targetDir string, diagnostics *Diagnostics) (WindowsIdentity, error) {
-	if !isAdministrator() {
-		return WindowsIdentity{}, fail("Execute o instalador como administrador.")
-	}
-	identity, err := windowsIdentities()
-	if err != nil {
-		return identity, fail("O Windows não informou a conta desta sessão.")
-	}
-	diagnostics.Event("contas", map[bool]string{true: "ok", false: "erro"}[identity.SameUser], "Conta interativa e conta elevada identificadas", map[string]any{
-		"interactive_user": identity.InteractiveUser, "process_user": identity.ProcessUser, "session_id": identity.SessionID,
-	})
-	if !identity.InteractiveDetected {
-		return identity, fail("O Windows não informou qual conta está conectada nesta sessão. A TI precisa executar o setup dentro da sessão RDP/console que ficará com o robô.")
-	}
-	if !identity.SameUser {
-		return identity, fail("O usuário conectado ao Windows é diferente da conta informada no UAC. Sessão: %s. Elevação: %s. Entre no servidor com a conta que ficará executando o Integrador. Nenhum login ou Machine ID foi alterado.", identity.InteractiveUser, identity.ProcessUser)
-	}
-	appData, localData, temporary := os.Getenv("APPDATA"), os.Getenv("LOCALAPPDATA"), os.Getenv("TEMP")
-	if temporary == "" {
-		temporary = os.TempDir()
-	}
-	if appData == "" || localData == "" || temporary == "" {
-		return identity, fail("O perfil do Windows não informou AppData, LocalAppData ou TEMP.")
-	}
-	paths := map[string]string{
-		"install_dir":     targetDir,
-		"temp":            temporary,
-		"settings":        filepath.Join(appData, "mixfiscal-integrador"),
-		"webview_profile": filepath.Join(appData, "desktop-integrador.exe", "EBWebView"),
-		"local_profile":   filepath.Join(localData, "MixFiscal", "Installer"),
-	}
-	for name, path := range paths {
-		if err := ProbeDirectory(path); err != nil {
-			diagnostics.Event("perfil", "erro", err.Error(), map[string]any{"area": name, "path": path})
-			return identity, fail("A conta %s não consegue preparar %s em %s. A TI precisa liberar leitura, gravação, criação e renomeação nesse caminho.", identity.InteractiveUser, name, path)
-		}
-		diagnostics.Event("perfil", "ok", "Leitura e gravação confirmadas", map[string]any{"area": name, "path": path})
-	}
-	if err := probeTaskScheduler(); err != nil {
-		diagnostics.Event("agendador", "erro", err.Error(), nil)
-		return identity, err
-	}
-	diagnostics.Event("agendador", "ok", "Serviço Schedule e criação de tarefa confirmados", nil)
-	return identity, nil
 }
 
 func WebView2Version() string {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, verifySession } from "@/lib/session";
 import { getUser } from "@/lib/users";
-import { listAgents, queueCommand } from "@/lib/agent-control";
+import { identifyAgent, listAgents, queueCommand } from "@/lib/agent-control";
 
 export const runtime = "nodejs";
 
@@ -25,5 +25,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(command, { status: 201 });
   } catch (error) {
     return NextResponse.json({ detail: error instanceof Error ? error.message : "Nao foi possivel enviar o comando." }, { status: 422 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const user = await current(request);
+  if (!user) return NextResponse.json({ detail: "Sessão expirada." }, { status: 401 });
+  try {
+    const body = await request.json();
+    return NextResponse.json(await identifyAgent(user.owner_id, String(body.agent_id || ""), String(body.client_name || ""), String(body.retaguarda || "")));
+  } catch (error) {
+    return NextResponse.json({detail:error instanceof Error ? error.message : "Não foi possível identificar o cliente."}, {status:422});
   }
 }

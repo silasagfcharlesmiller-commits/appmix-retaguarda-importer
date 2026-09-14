@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { acceptHeartbeat, authenticateAgent, completeCommand, registerAgent } from "@/lib/agent-control";
+import { agentSelfTest, acceptHeartbeat, authenticateAgent, completeCommand, registerAgent } from "@/lib/agent-control";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ action: string }> }) {
   try {
     const { action } = await context.params;
+    if (action === "health") return NextResponse.json({ok:true, protocol:2});
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     if (action === "enroll") {
       const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() || "";
@@ -16,6 +17,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       request.headers.get("x-mix-agent-token") || "",
     );
     if (!agent) return NextResponse.json({ detail: "Agente nao autorizado." }, { status: 401 });
+    if (action === "self-test") return NextResponse.json(await agentSelfTest(agent, body));
+    if (action === "status") return NextResponse.json(await acceptHeartbeat(agent, body, true));
     if (action === "heartbeat") return NextResponse.json(await acceptHeartbeat(agent, body));
     if (action === "result") return NextResponse.json(await completeCommand(agent, body));
     return NextResponse.json({ detail: "Operacao inexistente." }, { status: 404 });

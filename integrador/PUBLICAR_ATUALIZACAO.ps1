@@ -47,6 +47,7 @@ foreach ($name in $componentNames) {
 $executable = $components | Where-Object { $_.name -eq 'desktop-integrador.exe' }
 $manifest = [ordered]@{
     schema = 2
+    agent_protocol = 2
     version = $Versao
     channel = 'stable'
     published_at = [DateTimeOffset]::UtcNow.ToString('o')

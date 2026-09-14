@@ -95,7 +95,7 @@ try {
         -o (Join-Path $runtimeDir 'MixFiscal-Bootstrap.exe') .\cmd\bootstrap
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar o bootstrap do WebView2.' }
 
-    & $go build -buildvcs=false -trimpath -ldflags '-s -w -H windowsgui' `
+    & $go build -buildvcs=false -trimpath -ldflags "-s -w -H windowsgui -X appmix/integrador-installer/internal/agent.BuildVersion=$version" `
         -o (Join-Path $runtimeDir 'MixFiscalAgentService.exe') .\cmd\agent
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar o servico nativo Mix Agent.' }
 

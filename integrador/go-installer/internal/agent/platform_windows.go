@@ -26,34 +26,47 @@ func hiddenCommand(name string, args ...string) *exec.Cmd {
 	return command
 }
 
-func processByPath(target string) (uint32, bool) {
+func processState(target string) (uint32, bool, bool) {
 	target, err := filepath.Abs(target)
 	if err != nil {
-		return 0, false
+		return 0, false, false
 	}
 	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
-		return 0, false
+		return 0, false, false
 	}
 	defer windows.CloseHandle(snapshot)
 	entry := windows.ProcessEntry32{Size: uint32(unsafeSizeofProcessEntry())}
+	unknown := false
 	for err = windows.Process32First(snapshot, &entry); err == nil; err = windows.Process32Next(snapshot, &entry) {
+		if !strings.EqualFold(windows.UTF16ToString(entry.ExeFile[:]), filepath.Base(target)) {
+			continue
+		}
 		process, openErr := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, entry.ProcessID)
 		if openErr != nil {
+			unknown = true
 			continue
 		}
 		buffer := make([]uint16, 32768)
 		size := uint32(len(buffer))
 		queryErr := windows.QueryFullProcessImageName(process, 0, &buffer[0], &size)
 		windows.CloseHandle(process)
+		if queryErr != nil {
+			unknown = true
+		}
 		if queryErr == nil && strings.EqualFold(filepath.Clean(windows.UTF16ToString(buffer[:size])), filepath.Clean(target)) {
-			return entry.ProcessID, true
+			return entry.ProcessID, true, true
 		}
 	}
 	if err != nil && !errors.Is(err, errNoMoreFiles) {
-		return 0, false
+		return 0, false, false
 	}
-	return 0, false
+	return 0, false, !unknown
+}
+
+func processByPath(target string) (uint32, bool) {
+	pid, running, _ := processState(target)
+	return pid, running
 }
 
 func unsafeSizeofProcessEntry() uintptr {
@@ -61,15 +74,38 @@ func unsafeSizeofProcessEntry() uintptr {
 	return unsafe.Sizeof(entry)
 }
 
-func sessionReady() bool {
-	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-	if err != nil {
+func sessionReadyForUser(user string) bool {
+	// WTS works on Windows Server without explorer.exe and checks the launcher's
+	// account, rather than incorrectly accepting another user's desktop.
+	type sessionInfo struct {
+		ID      uint32
+		Station *uint16
+		State   uint32
+	}
+	dll := windows.NewLazySystemDLL("wtsapi32.dll")
+	var buffer *sessionInfo
+	var count uint32
+	ok, _, _ := dll.NewProc("WTSEnumerateSessionsW").Call(0, 0, 1, uintptr(unsafe.Pointer(&buffer)), uintptr(unsafe.Pointer(&count)))
+	if ok == 0 {
 		return false
 	}
-	defer windows.CloseHandle(snapshot)
-	entry := windows.ProcessEntry32{Size: uint32(unsafeSizeofProcessEntry())}
-	for err = windows.Process32First(snapshot, &entry); err == nil; err = windows.Process32Next(snapshot, &entry) {
-		if strings.EqualFold(windows.UTF16ToString(entry.ExeFile[:]), "explorer.exe") {
+	defer dll.NewProc("WTSFreeMemory").Call(uintptr(unsafe.Pointer(buffer)))
+	value := func(id, class uint32) string {
+		var text *uint16
+		var size uint32
+		ok, _, _ := dll.NewProc("WTSQuerySessionInformationW").Call(0, uintptr(id), uintptr(class), uintptr(unsafe.Pointer(&text)), uintptr(unsafe.Pointer(&size)))
+		if ok == 0 || text == nil {
+			return ""
+		}
+		defer dll.NewProc("WTSFreeMemory").Call(uintptr(unsafe.Pointer(text)))
+		return windows.UTF16PtrToString(text)
+	}
+	for _, session := range unsafe.Slice(buffer, int(count)) {
+		if session.ID == 0 {
+			continue
+		}
+		username, domain := value(session.ID, 5), value(session.ID, 7)
+		if username != "" && (strings.EqualFold(domain+`\`+username, user) || strings.EqualFold(username, user)) {
 			return true
 		}
 	}
@@ -88,7 +124,10 @@ func setNativeTasks(enabled bool) {
 
 func stopIntegrator(config Config) error {
 	setNativeTasks(false)
-	pid, running := processByPath(config.IntegratorPath)
+	pid, running, observed := processState(config.IntegratorPath)
+	if !observed {
+		return fmt.Errorf("consulta de processo bloqueada; encerramento não confirmado. TI: liberar consulta do caminho do executável para o serviço")
+	}
 	if !running {
 		return nil
 	}
@@ -109,12 +148,37 @@ func startIntegrator(config Config) error {
 	if _, err := os.Stat(config.IntegratorPath); err != nil {
 		return fmt.Errorf("executavel do Integrador nao encontrado: %w", err)
 	}
+	_, running, observed := processState(config.IntegratorPath)
+	if !observed {
+		return fmt.Errorf("consulta do processo indisponível; abertura não confirmada para evitar instância duplicada")
+	}
 	setNativeTasks(true)
-	if _, running := processByPath(config.IntegratorPath); running {
+	if !running {
+		if err := hiddenCommand("schtasks.exe", "/Run", "/TN", LauncherTask).Run(); err != nil {
+			return fmt.Errorf("nao foi possivel iniciar o lancador do Integrador: %w", err)
+		}
+	}
+	if awaitStableProcess(func() bool { _, found := processByPath(config.IntegratorPath); return found }, 30*time.Second, 3*time.Second, 300*time.Millisecond) {
 		return nil
 	}
-	if err := hiddenCommand("schtasks.exe", "/Run", "/TN", LauncherTask).Run(); err != nil {
-		return fmt.Errorf("nao foi possivel iniciar o lancador do Integrador: %w", err)
+	return fmt.Errorf("o Windows aceitou a tarefa, mas a abertura está inconclusiva: processo não confirmado por 30 s. TI: verificar a conta %s, a tarefa %s, antivírus e permissão do executável %s", config.WindowsUser, LauncherTask, config.IntegratorPath)
+}
+
+func awaitStableProcess(probe func() bool, timeout, stable, interval time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	var stableSince time.Time
+	for time.Now().Before(deadline) {
+		if probe() {
+			if stableSince.IsZero() {
+				stableSince = time.Now()
+			}
+			if time.Since(stableSince) >= stable {
+				return true
+			}
+		} else {
+			stableSince = time.Time{}
+		}
+		time.Sleep(interval)
 	}
-	return nil
+	return false
 }

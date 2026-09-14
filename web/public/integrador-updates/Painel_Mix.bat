@@ -46,6 +46,8 @@ if not defined NOME_EXE set "NOME_EXE=desktop-integrador.exe"
 set "NOME_PROCESSO=%NOME_EXE:.exe=%"
 set "NOME_TAREFA=Mix Fiscal - Monitorar Integrador"
 set "NOME_TAREFA_ANTIGA=Monitor_Mix_Fiscal"
+set "NOME_SERVICO_AGENTE=MixFiscalAgent"
+set "TAREFA_LANCADOR=Mix Fiscal - Abrir Integrador"
 set "TAREFA_BOOT=\MixFiscalIntegrador\BootStart"
 set "TAREFA_STARTUP=\MixFiscalIntegrador\Startup"
 set "TAREFA_WATCHDOG=\MixFiscalIntegrador\Watchdog"
@@ -180,9 +182,8 @@ goto MENU
 
 :PARAR
 cls
-echo Encerrando o Integrador e os processos WebView2...
-taskkill /f /im "%NOME_EXE%" >nul 2>&1
-taskkill /f /im msedgewebview2.exe >nul 2>&1
+echo Encerrando o Integrador e somente os processos filhos dele...
+taskkill /f /t /im "%NOME_EXE%" >nul 2>&1
 echo Processos encerrados.
 echo.
 pause
@@ -200,6 +201,24 @@ call :REMOVER_TAREFA "%NOME_TAREFA%"
 if errorlevel 1 set /a FALHAS_LIMPEZA+=1
 call :REMOVER_TAREFA "%NOME_TAREFA_ANTIGA%"
 if errorlevel 1 set /a FALHAS_LIMPEZA+=1
+call :REMOVER_TAREFA "%TAREFA_LANCADOR%"
+if errorlevel 1 set /a FALHAS_LIMPEZA+=1
+
+:: A versao 1.3 usa um servico nativo. A opcao 5 tambem o remove para
+:: permitir manutencao e retorno seguro ao monitor anterior.
+call sc query "%NOME_SERVICO_AGENTE%" >nul 2>&1
+if not errorlevel 1 (
+    call sc stop "%NOME_SERVICO_AGENTE%" >nul 2>&1
+    timeout /t 3 >nul
+    call sc delete "%NOME_SERVICO_AGENTE%" >nul 2>&1
+    call sc query "%NOME_SERVICO_AGENTE%" >nul 2>&1
+    if not errorlevel 1 (
+        echo [ERRO] O servico Mix Agent continua registrado.
+        set /a FALHAS_LIMPEZA+=1
+    ) else (
+        echo [OK] Servico Mix Agent removido.
+    )
+)
 
 :: Estas tarefas pertencem ao Integrador. Mantemos as definicoes para que a
 :: opcao 2 consiga reativa-las sem precisar reinstalar o aplicativo.
@@ -272,6 +291,12 @@ if %errorlevel% equ 0 (
     echo [ATIVO] O monitor invisivel esta instalado.
 ) else (
     echo [INATIVO] O monitor invisivel nao esta instalado.
+)
+call sc query "%NOME_SERVICO_AGENTE%" 2>nul | findstr /I "RUNNING" >nul
+if %errorlevel% equ 0 (
+    echo [ATIVO] O servico nativo Mix Agent esta em execucao.
+) else (
+    echo [INATIVO] O servico nativo Mix Agent nao esta em execucao.
 )
 echo.
 pause

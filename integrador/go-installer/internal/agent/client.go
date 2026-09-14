@@ -51,6 +51,7 @@ func apiRequest(ctx context.Context, method, endpoint string, body any, headers 
 func enroll(ctx context.Context, input ProvisionInput) (enrollmentResponse, error) {
 	computer, _ := computerName()
 	request := enrollmentRequest{
+		ClientName: input.ClientName, Retaguarda: input.Retaguarda,
 		MixLogin: input.MixLogin, CNPJ: input.CNPJ, MachineID: input.MachineID,
 		ComputerName: computer, WindowsUser: input.WindowsUser,
 		IntegratorPath: input.IntegratorPath, AgentVersion: input.AgentVersion,
@@ -72,9 +73,10 @@ func enroll(ctx context.Context, input ProvisionInput) (enrollmentResponse, erro
 	return response, nil
 }
 
-func heartbeat(ctx context.Context, config Config, secret string, online, session bool) (HeartbeatResponse, error) {
+func heartbeat(ctx context.Context, config Config, secret string, online, session bool, observation ...bool) (HeartbeatResponse, error) {
 	var response HeartbeatResponse
-	err := apiRequest(ctx, http.MethodPost, strings.TrimRight(config.APIBase, "/")+"/heartbeat", heartbeatRequest{
+	observed := len(observation) == 0 || observation[0]
+	err := apiRequest(ctx, http.MethodPost, strings.TrimRight(config.APIBase, "/")+"/heartbeat", heartbeatRequest{Protocol: 2, IntegratorObserved: observed,
 		AgentVersion: config.AgentVersion, IntegratorOnline: online, SessionReady: session,
 		IntegratorPath: config.IntegratorPath, WindowsUser: config.WindowsUser,
 	}, agentHeaders(config.AgentID, secret), &response)

@@ -15,7 +15,7 @@ import (
 )
 
 func Provision(ctx context.Context, input ProvisionInput) (Config, error) {
-	if strings.TrimSpace(input.SourceExecutable) == "" || strings.TrimSpace(input.IntegratorPath) == "" {
+	if strings.TrimSpace(input.SourceExecutable) == "" || strings.TrimSpace(input.IntegratorPath) == "" || strings.TrimSpace(input.AgentExecutable) == "" {
 		return Config{}, fmt.Errorf("caminhos do Agente e do Integrador sao obrigatorios")
 	}
 	if input.APIBase == "" {
@@ -31,7 +31,11 @@ func Provision(ctx context.Context, input ProvisionInput) (Config, error) {
 		return Config{}, fmt.Errorf("o Windows nao protegeu a credencial do Agente: %w", err)
 	}
 	config := Config{
-		APIBase: strings.TrimRight(input.APIBase, "/"), AgentID: registration.AgentID,
+		AgentExecutable:  input.AgentExecutable,
+		InstallerSetup:   input.InstallerSetup,
+		ManageIntegrator: input.ManageIntegrator,
+		InstallerRuntime: input.InstallerRuntime,
+		APIBase:          strings.TrimRight(input.APIBase, "/"), AgentID: registration.AgentID,
 		ProtectedSecret: protected, CNPJ: input.CNPJ, MachineID: input.MachineID,
 		IntegratorPath: input.IntegratorPath, WindowsUser: input.WindowsUser,
 		AgentVersion: input.AgentVersion, DesiredState: "running",
@@ -39,15 +43,22 @@ func Provision(ctx context.Context, input ProvisionInput) (Config, error) {
 	if err := stopAndRemoveService(); err != nil {
 		return Config{}, err
 	}
-	destination := installedExecutable()
+	destination := filepath.Clean(input.AgentExecutable)
+	if !strings.EqualFold(filepath.Dir(destination), filepath.Dir(input.IntegratorPath)) || !strings.EqualFold(filepath.Base(destination), "MixFiscalAgentService.exe") {
+		return Config{}, fmt.Errorf("o executável do Agente precisa ficar ao lado do desktop-integrador.exe")
+	}
 	if err := copyExecutable(input.SourceExecutable, destination); err != nil {
 		return Config{}, fmt.Errorf("nao foi possivel instalar o executavel do Agente: %w", err)
 	}
-	if err := saveConfig(config); err != nil {
-		return Config{}, fmt.Errorf("nao foi possivel salvar a configuracao protegida do Agente: %w", err)
+	dataDirectory := dataDirectoryForExecutable(destination)
+	if err := os.MkdirAll(dataDirectory, 0o700); err != nil {
+		return Config{}, fmt.Errorf("nao foi possivel preparar os dados protegidos do Agente: %w", err)
 	}
-	if err := restrictDataDirectory(); err != nil {
+	if err := restrictDataDirectory(dataDirectory); err != nil {
 		return Config{}, fmt.Errorf("nao foi possivel proteger os arquivos do Agente: %w", err)
+	}
+	if err := saveConfigAt(config, dataDirectory); err != nil {
+		return Config{}, fmt.Errorf("nao foi possivel salvar a configuracao protegida do Agente: %w", err)
 	}
 	if err := installLauncher(input.IntegratorPath); err != nil {
 		return Config{}, err
@@ -60,8 +71,8 @@ func Provision(ctx context.Context, input ProvisionInput) (Config, error) {
 	return config, nil
 }
 
-func restrictDataDirectory() error {
-	output, err := hiddenCommand("icacls.exe", dataDirectory(), "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F").CombinedOutput()
+func restrictDataDirectory(directory string) error {
+	output, err := hiddenCommand("icacls.exe", directory, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", strings.TrimSpace(string(output)))
 	}
@@ -101,7 +112,7 @@ func installLauncher(integratorPath string) error {
 	command := fmt.Sprintf("\"%s\"", integratorPath)
 	output, err := hiddenCommand(
 		"schtasks.exe", "/Create", "/TN", LauncherTask, "/TR", command,
-		"/SC", "ONCE", "/ST", "23:59", "/IT", "/RL", "HIGHEST", "/F",
+		"/SC", "ONCE", "/ST", "00:00", "/SD", "01/01/2000", "/IT", "/RL", "HIGHEST", "/F",
 	).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("nao foi possivel criar o lancador interativo: %s", strings.TrimSpace(string(output)))

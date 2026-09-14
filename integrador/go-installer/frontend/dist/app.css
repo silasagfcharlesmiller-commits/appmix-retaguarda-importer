@@ -258,6 +258,19 @@ h2 { margin: 0; color: #183027; font-size: 16px; letter-spacing: -.2px; }
 footer { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px 0 0; color: #84928c; font-size: 9px; font-weight: 700; letter-spacing: 1.1px; }
 .footer-divider { width: 3px; height: 3px; background: #aabdaf; border-radius: 50%; }
 
+.checks { list-style: none; padding: 0; margin: 14px 0; display: grid; gap: 8px; }
+.checks li { border: 1px solid #dce5e0; border-radius: 8px; padding: 10px; font-size: 12px; }
+.checks strong, .checks span { display: block; }
+.checks span { margin-top: 4px; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+.check-ok strong { color: #176442; }
+.check-warning strong, .check-pending strong { color: #815400; }
+.check-error strong { color: #ad2626; }
+.agent-only-button { width: 100%; margin-top: 12px; }
+.preparation { font-size: 12px; line-height: 1.5; margin-top: 16px; }
+.preparation label { display: block; margin: 12px 0; }
+.preparation input { width: auto; }
+#modalMessage { max-height: 55vh; text-align: left; user-select: text; }
+
 .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgba(10, 26, 20, .48); backdrop-filter: blur(5px); }
 .modal-backdrop[hidden] { display: none; }
 .modal { width: min(430px, 100%); padding: 28px; text-align: center; background: white; border: 1px solid rgba(255,255,255,.8); border-radius: 22px; box-shadow: 0 24px 80px rgba(12, 39, 29, .3); }

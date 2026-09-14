@@ -2,8 +2,10 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -44,7 +46,7 @@ func (handler *serviceHandler) Execute(_ []string, requests <-chan svc.ChangeReq
 }
 
 func (handler *serviceHandler) loop(ctx context.Context) {
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		handler.cycle(ctx)
@@ -62,28 +64,77 @@ func (handler *serviceHandler) cycle(ctx context.Context) {
 		appendLog("ERRO", "Configuracao do Agente indisponivel: "+err.Error())
 		return
 	}
-	_, online := processByPath(config.IntegratorPath)
-	ready := sessionReady()
-	response, err := heartbeat(ctx, config, secret, online, ready)
+	_, online, observed := processState(config.IntegratorPath)
+	ready := sessionReadyForUser(config.WindowsUser)
+	if config.ResultPending && config.LastResult != nil {
+		if err := reportResult(ctx, config, secret, *config.LastResult); err != nil {
+			// A failed acknowledgement must not make a functioning service look
+			// offline, nor consume another command before this one is acknowledged.
+			_ = apiRequest(ctx, "POST", config.APIBase+"/status", heartbeatRequest{Protocol: 2, IntegratorObserved: observed, AgentVersion: config.AgentVersion, IntegratorOnline: online, SessionReady: ready}, agentHeaders(config.AgentID, secret), nil)
+			return
+		}
+		config.ResultPending = false
+		if err := saveConfig(config); err != nil {
+			return
+		}
+	}
+	response, err := heartbeat(ctx, config, secret, online, ready, observed)
 	if err != nil {
 		appendLog("ATENCAO", "Heartbeat falhou: "+err.Error())
-		handler.enforce(config, online, ready)
+		handler.enforce(config, online, ready && observed)
 		return
 	}
+	_ = atomicAgentJSON(filepath.Join(dataDirectory(), "heartbeat-proof.json"), struct {
+		Version string
+		At      time.Time
+	}{BuildVersion, time.Now()})
+	if data, err := os.ReadFile(filepath.Join(dataDirectory(), "update-result.json")); err == nil {
+		var result commandResult
+		if json.Unmarshal(data, &result) == nil && reportResult(ctx, config, secret, result) == nil {
+			_ = os.Remove(filepath.Join(dataDirectory(), "update-result.json"))
+		}
+	}
 	if response.DesiredState == "running" || response.DesiredState == "paused" {
+		changed := config.DesiredState != response.DesiredState
 		config.DesiredState = response.DesiredState
-		if err := saveConfig(config); err != nil {
+		if err := func() error {
+			if changed {
+				return saveConfig(config)
+			}
+			return nil
+		}(); err != nil {
 			appendLog("ATENCAO", "Nao foi possivel persistir o estado: "+err.Error())
 		}
 	}
 	if response.Command != nil {
-		success, message := handler.execute(config, *response.Command, ready)
-		if err := reportResult(ctx, config, secret, commandResult{CommandID: response.Command.ID, Success: success, Message: message}); err != nil {
-			appendLog("ATENCAO", "Resultado do comando nao foi enviado: "+err.Error())
+		if config.LastResult != nil && config.LastResult.CommandID == response.Command.ID {
+			_ = reportResult(ctx, config, secret, *config.LastResult)
+			return
 		}
+		if response.Command.Action == "update" {
+			if err := beginUpdate(config, response.Command.ID); err == nil {
+				return
+			} else {
+				config.LastResult = &commandResult{CommandID: response.Command.ID, Success: false, Message: err.Error()}
+			}
+		} else {
+			success, message := handler.execute(config, *response.Command, ready)
+			config.LastResult = &commandResult{CommandID: response.Command.ID, Success: success, Message: message}
+		}
+		config.ResultPending = true
+		if err := saveConfig(config); err != nil {
+			appendLog("ERRO", "Resultado não persistido: "+err.Error())
+			return
+		}
+		if err := reportResult(ctx, config, secret, *config.LastResult); err == nil {
+			config.ResultPending = false
+			_ = saveConfig(config)
+		}
+		_, online, observed = processState(config.IntegratorPath)
+		_ = apiRequest(ctx, "POST", config.APIBase+"/status", heartbeatRequest{Protocol: 2, IntegratorObserved: observed, AgentVersion: config.AgentVersion, IntegratorOnline: online, SessionReady: sessionReadyForUser(config.WindowsUser)}, agentHeaders(config.AgentID, secret), nil)
 		return
 	}
-	handler.enforce(config, online, ready)
+	handler.enforce(config, online, ready && observed)
 }
 
 func (handler *serviceHandler) execute(config Config, command Command, ready bool) (bool, string) {
@@ -102,8 +153,11 @@ func (handler *serviceHandler) execute(config Config, command Command, ready boo
 			return false, err.Error()
 		}
 		handler.lastStart = time.Now()
-		return true, "Comando de abertura enviado para a sessao do Windows."
+		return true, "Processo do Integrador aberto e confirmado na máquina."
 	case "restart":
+		if !ready {
+			return false, "Aguardando a sessão da conta configurada; o Integrador foi preservado."
+		}
 		if err := stopIntegrator(config); err != nil {
 			return false, err.Error()
 		}
@@ -121,6 +175,9 @@ func (handler *serviceHandler) execute(config Config, command Command, ready boo
 }
 
 func (handler *serviceHandler) enforce(config Config, online, ready bool) {
+	if _, _, observed := processState(config.IntegratorPath); !observed {
+		return
+	}
 	if config.DesiredState == "paused" {
 		if online {
 			if err := stopIntegrator(config); err != nil {

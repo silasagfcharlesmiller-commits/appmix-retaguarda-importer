@@ -34,24 +34,24 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 
 [Files]
 Source: "{#RuntimeDir}\*"; DestDir: "{app}\.mix-installer"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SourceDir}\desktop-integrador.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\Painel_Mix.bat"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\atualizador_mix.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\monitor_mix.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\integrador_version.json"; DestDir: "{app}"; Flags: ignoreversion
-
-[InstallDelete]
-Type: files; Name: "{app}\run_silent.vbs"
+Source: "{#SourceDir}\desktop-integrador.exe"; DestDir: "{app}\.mix-installer\payload"; Flags: ignoreversion
+Source: "{#SourceDir}\Painel_Mix.bat"; DestDir: "{app}\.mix-installer\payload"; Flags: ignoreversion
+Source: "{#SourceDir}\atualizador_mix.ps1"; DestDir: "{app}\.mix-installer\payload"; Flags: ignoreversion
+Source: "{#SourceDir}\monitor_mix.ps1"; DestDir: "{app}\.mix-installer\payload"; Flags: ignoreversion
+Source: "{#SourceDir}\integrador_version.json"; DestDir: "{app}\.mix-installer\payload"; Flags: ignoreversion
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
   Parameters: String;
+  OriginSetup: String;
 begin
-  if CurStep = ssPostInstall then
+  if (CurStep = ssPostInstall) and (ExpandConstant('{param:AGENTUPDATE|0}') <> '1') then
   begin
-    Parameters := '--install-dir "' + ExpandConstant('{app}') + '"';
+    OriginSetup := ExpandConstant('{param:ORIGINSETUP}');
+    if OriginSetup = '' then OriginSetup := ExpandConstant('{srcexe}');
+    Parameters := '--install-dir "' + ExpandConstant('{app}') + '" --setup-path "' + OriginSetup + '"';
     if not Exec(
       ExpandConstant('{app}\.mix-installer\MixFiscal-Bootstrap.exe'),
       Parameters,
