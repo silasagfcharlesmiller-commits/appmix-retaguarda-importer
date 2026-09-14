@@ -51,6 +51,12 @@ export default function RobotsPage() {
         const next = { ...current };
         for (const agent of agents) {
           const operation = next[agent.id];
+          if (!operation && agent.last_command_id && agent.last_action && agent.last_command_status && activeStatus(agent.last_command_status)) {
+            next[agent.id] = { commandId: String(agent.last_command_id), action: agent.last_action, status: agent.last_command_status };
+            locks.current.add(agent.id);
+            changed = true;
+            continue;
+          }
           if (!operation?.commandId || String(agent.last_command_id || "") !== operation.commandId) continue;
           const status = agent.last_command_status;
           if (!status || status === operation.status) continue;
