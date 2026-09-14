@@ -1,43 +1,43 @@
 {
     "schema":  2,
     "agent_protocol":  2,
-    "version":  "1.3.1",
+    "version":  "1.3.2",
     "channel":  "stable",
-    "published_at":  "2026-09-14T22:54:26.9893805+00:00",
+    "published_at":  "2026-09-14T23:16:09.4985122+00:00",
     "executable":  {
-                       "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.3.1",
+                       "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.3.2",
                        "sha256":  "EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8",
                        "size":  44513792
                    },
     "files":  [
                   {
                       "name":  "desktop-integrador.exe",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.3.1",
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/desktop-integrador.exe?v=1.3.2",
                       "sha256":  "EBC1485F38B1F1B0D252F44FD306338A2868F99B1C3D2D7716704F7066EF7ED8",
                       "size":  44513792
                   },
                   {
                       "name":  "Painel_Mix.bat",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/Painel_Mix.bat?v=1.3.1",
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/Painel_Mix.bat?v=1.3.2",
                       "sha256":  "FFAA0C3F853992037364F0296880D30480B2E0B7460AC3D1B73B451285BCEDFA",
                       "size":  10721
                   },
                   {
                       "name":  "monitor_mix.ps1",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/monitor_mix.ps1?v=1.3.1",
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/monitor_mix.ps1?v=1.3.2",
                       "sha256":  "C1AF98C18D9A254E5DB998CC52206E9A0BF805212BB86C7D1A0D9604BE962588",
                       "size":  1803
                   },
                   {
                       "name":  "atualizador_mix.ps1",
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/atualizador_mix.ps1?v=1.3.1",
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/integrador-updates/atualizador_mix.ps1?v=1.3.2",
                       "sha256":  "E183E6B5641DE48D76048C53BCB77B77E9B2AAD95446C9573D71CFC0D5A720A0",
                       "size":  10222
                   }
               ],
     "installer":  {
-                      "url":  "https://appmix-retaguarda-importer.vercel.app/downloads/Instalador-Mix-Fiscal.exe?v=1.3.1",
-                      "sha256":  "F18DAC0F9B39FB349E7E5708F2F728CA0F962640663553069EC4C4E9E09721D5",
-                      "size":  14375097
+                      "url":  "https://appmix-retaguarda-importer.vercel.app/downloads/Instalador-Mix-Fiscal.exe?v=1.3.2",
+                      "sha256":  "FE94FD00B8FE39309B01A4D7E9EC250DB0B5317D3BDCC23E4995CEA5501CD491",
+                      "size":  14378186
                   }
 }

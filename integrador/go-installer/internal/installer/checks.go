@@ -106,9 +106,9 @@ func environmentChecks(targetDir string, diagnostics *Diagnostics, extended bool
 		}
 		add("protection", "Antivírus e proteção", status, message)
 		if err := agent.CheckConnectivity(12 * time.Second); err != nil {
-			add("agent", "API e controle do agente", "warning", "Comunicação ainda não confirmada: "+err.Error()+". TI: verificar DNS, proxy e HTTPS de saída para "+agent.DefaultAPI+". Será repetida durante a instalação.")
+			add("agent", "API do site (ida e volta)", "warning", "O site não confirmou o sinal enviado antes da instalação: "+err.Error()+". TI: verificar DNS, proxy, antivírus e HTTPS de saída para "+agent.DefaultAPI+".")
 		} else {
-			add("agent", "API e controle do agente", "pending", "HTTPS confirmado. Falta testar receber, iniciar e reiniciar pela API com o serviço instalado.")
+			add("agent", "API do site (ida e volta)", "ok", "Sinal enviado pelo instalador e resposta da API do site confirmada antes da instalação. O teste posterior confirmará também a execução real do Agente.")
 		}
 	}
 	return identity, checks

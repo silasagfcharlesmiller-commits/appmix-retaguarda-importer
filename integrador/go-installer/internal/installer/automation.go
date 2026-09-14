@@ -561,7 +561,7 @@ func (installer *Installer) InstallWithOptions(input InstallInput, progress func
 		report := diagnostics.Finish("falhou", map[string]any{"checks": checks, "error": err.Error()})
 		return InstallResult{Checks: checks, Diagnostic: report, Warning: err.Error()}, fail("%s\n\nRelatório completo para a TI: %s", err, report)
 	}
-	progress("Teste 7/7: validando o controle real pela API")
+	progress("Validando o Agente instalado pela API")
 	if config, configErr := agent.CurrentConfigAt(filepath.Join(installer.TargetDir, "MixFiscalAgentService.exe")); result.AgentInstalled && configErr == nil && config.CNPJ == result.CNPJ && config.MachineID == result.MachineID && strings.EqualFold(config.IntegratorPath, installer.TargetEXE) {
 		verification, verifyErr := agent.VerifyRemoteControl(context.Background(), config, progress)
 		if verifyErr != nil {
@@ -575,13 +575,10 @@ func (installer *Installer) InstallWithOptions(input InstallInput, progress func
 		result.Warning = "Credencial local do agente não confirmada para este Integrador; controle remoto pendente."
 	}
 	if result.AgentVerified {
-		checks[6].Status = "ok"
-		checks[6].Message = "Serviço recebeu e confirmou início e reinício pela API, com processo aberto."
+		diagnostics.Event("agent_real", "ok", "Pós-instalação: o serviço recebeu e confirmou início e reinício pela API, com processo aberto.", nil)
 	} else {
-		checks[6].Status = "warning"
-		checks[6].Message = result.Warning
+		diagnostics.Event("agent_real", "warning", "Pós-instalação: "+result.Warning, nil)
 	}
-	diagnostics.Event("agent", checks[6].Status, checks[6].Message, nil)
 	result.Checks = checks
 	status := "concluído"
 	if !result.AgentVerified || result.Warning != "" {

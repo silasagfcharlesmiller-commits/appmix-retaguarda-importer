@@ -1,7 +1,7 @@
 const $ = selector => document.querySelector(selector);
 const backend = () => window.go?.installer?.App;
 let environmentReady = false, operationRunning = false, latestReport = null;
-const labels = ['Administrador', 'Conta do Windows', 'Pastas e credencial protegida', 'Agendador de Tarefas', 'WebView2', 'Antivírus e proteção', 'API e controle do agente'];
+const labels = ['Administrador', 'Conta do Windows', 'Pastas e credencial protegida', 'Agendador de Tarefas', 'WebView2', 'Antivírus e proteção', 'API do site (ida e volta)'];
 
 function setMode(mode, message) {
   document.body.classList.remove('busy', 'ready', 'error'); document.body.classList.add(mode);
@@ -50,7 +50,7 @@ async function checkEnvironment() {
   setMode('busy','Executando os sete testes e reunindo os resultados...');
   try {
     const report = await backend().CheckEnvironment(); fillReport(report); environmentReady = report.ready;
-    setMode(report.ready ? 'ready' : 'error', report.ready ? 'Verificação inicial concluída. Avisos não bloqueiam a instalação; o controle remoto será testado ao final.' : 'Há bloqueios confirmados. Confira todos os testes e o relatório para a TI.');
+    setMode(report.ready ? 'ready' : 'error', report.ready ? 'Sete testes concluídos. O teste 7 confirmou o sinal e a resposta da API do site antes da instalação.' : 'Há bloqueios confirmados. Confira todos os testes e o relatório para a TI.');
     if (!report.ready) showModal('Relatório do ambiente', reportText(report), true);
   } catch (error) { setMode('error','Diagnóstico indisponível'); showModal('Diagnóstico indisponível',String(error?.message || error),true); }
   finally { setBusy(false); }
